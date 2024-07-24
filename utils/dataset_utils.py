@@ -167,7 +167,6 @@ class mmlu_dataset:
         answer_indices = np.array(batch["answer"])  # array of integers
 
         for i in range(len(questions)):
-            prompt = f"The following is a multiple choice question (with answers) about{format_subject(subjects[i])}.\n\n"
             question = self.construct_question(
                 questions[i],
                 choices[i],

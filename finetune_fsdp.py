@@ -40,11 +40,11 @@ from utils.helpers_extract import (
     compute_weighted_ce,
     save_statistics,
 )
-from utils.dataset_utils import MMLU_Dataset
+from utils.dataset_utils import mmlu_dataset
 from utils.dataloader_utils import get_dataloader
 from utils.tokenizer_utils import get_tokenizer
 from utils.optimizer_utils import get_optimizer, get_scheduler
-from utils.model_utils import get_model_hf
+from utils.model_utils import get_model
 
 
 # *******************************************************************
@@ -61,31 +61,6 @@ def parse_args():
         type=str,
         default=None,
         help="The name of the dataset to use (via the datasets library).",
-    )
-    parser.add_argument(
-        "--dataset_config_name",
-        type=str,
-        default=None,
-        help="The configuration name of the dataset to use (via the datasets library).",
-    )
-    parser.add_argument(
-        "--train_file",
-        type=str,
-        default=None,
-        help="A csv or a json file containing the training data.",
-    )
-    parser.add_argument(
-        "--test_file",
-        type=str,
-        default=None,
-        help="A csv or a json file containing the training data.",
-    )
-
-    parser.add_argument(
-        "--val_file",
-        type=str,
-        default=None,
-        help="A csv or a json file containing the training data.",
     )
     parser.add_argument(
         "--model_name_or_path",
@@ -180,7 +155,7 @@ def parse_args():
     parser.add_argument(
         "--batch_size",
         type=int,
-        help="ratio of total training steps used for warmup.",
+        help="batch_size",
     )
     parser.add_argument(
         "--warmup_steps",
@@ -277,7 +252,6 @@ def parse_args():
     )
     parser.add_argument("--clip_grad_thresh", type=float, default=1.0)
     parser.add_argument("--lr_min_fact", type=float, default=0.01)
-    parser.add_argument("--overlap_base_dir", type=str, default=None, help="")
     parser.add_argument("--save_checkpoint", action="store_true")
     parser.add_argument("--eval_only", action="store_true")
     parser.add_argument("--weight_samples", action="store_true")
@@ -376,7 +350,7 @@ def main():
     # # *******************************************************
     # # Load pretrained model and tokenizer
 
-    model = get_model_hf(
+    model = get_model(
         accelerator=accelerator,
         model_name_or_path=args.model_name_or_path,
         low_cpu_mem_usage=args.low_cpu_mem_usage,
@@ -425,7 +399,7 @@ def main():
         max_seq_len = args.max_seq_length
     accelerator.print("max_seq_len: ", max_seq_len)
 
-    train_dataset, _ = MMLU_Dataset(
+    train_dataset, _ = mmlu_dataset(
         tokenizer=tokenizer,
         max_seq_len=max_seq_len,
         accelerator=accelerator,
@@ -435,7 +409,7 @@ def main():
     ).construct_dataset()
     accelerator.print(f"num_samples = {len(train_dataset)}")
 
-    val_dataset, _ = MMLU_Dataset(
+    val_dataset, _ = mmlu_dataset(
         tokenizer=tokenizer,
         max_seq_len=max_seq_len,
         accelerator=accelerator,
@@ -443,7 +417,7 @@ def main():
         split="validation",
     ).construct_dataset()
 
-    test_dataset, _ = MMLU_Dataset(
+    test_dataset, _ = mmlu_dataset(
         tokenizer=tokenizer,
         max_seq_len=max_seq_len,
         accelerator=accelerator,

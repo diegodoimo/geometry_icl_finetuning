@@ -12,7 +12,7 @@ wd = Path(__file__).parent.parent.resolve()
 sys.path.append(str(wd))
 
 
-def get_model_hf(
+def get_model(
     model_name_or_path,
     precision,
     low_cpu_mem_usage,

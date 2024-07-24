@@ -12,7 +12,7 @@ import sys
 from utils.helpers_extract import get_target_layers
 from utils.model_utils import get_model
 from utils.dataloader_utils import get_dataloader
-from utils.dataset_utils import MMLU_Dataset
+from utils.dataset_utils import mmlu_dataset
 from utils.tokenizer_utils import get_tokenizer
 from extraction.compute_distances import estract_representations
 import torch
@@ -28,14 +28,6 @@ from torch.distributed.fsdp import (
 
 from torch.distributed.fsdp.wrap import lambda_auto_wrap_policy
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
-
-
-# # Get the current directory (root directory of the package)
-# current_dir = os.path.dirname(os.path.abspath(__file__))
-
-# # Add the parent directory to the Python path
-# parent_dir = os.path.abspath(os.path.join(current_dir, ".."))
-# sys.path.insert(0, parent_dir)
 
 
 logger = get_logger(__name__)
@@ -212,30 +204,7 @@ def lambda_fn(module: torch.nn.Module):
 
 def main():
     args = parse_args()
-    # Initialize the accelerator. We will let the accelerator handle device placement for us in this example.
-    # If we're using tracking, we also need to initialize it here and it will by default pick up all supported trackers
-    # in the environment
 
-    # os.environ["ACCELERATE_MIXED_PRECISION"] = args.precision
-
-    # # we use fsdp also when world size ==1. accelerate issue in casting
-    # if int(os.environ["WORLD_SIZE"]) > 0:
-    #     os.environ["ACCELERATE_USE_FSDP"] = "true"
-
-    #     os.environ["ACCELERATE_USE_FSDP"] = "true"
-
-    #     os.environ["FSDP_SHRDING_STRATEGY"] = "FULL_SHARD"
-    #     os.environ["FSDP_AUTO_WRAP_POLICY"] = "TRANSFORMER_BASED_WRAP"
-    #     if args.model_name.startswith("llama"):
-    #         os.environ["FSDP_TRANSFORMER_CLS_TO_WRAP"] = "LlamaDecoderLayer"
-    #     elif args.model_name.startswith("mistral"):
-    #         os.environ["FSDP_TRANSFORMER_CLS_TO_WRAP"] = "MistralDecoderLayer"
-
-    #     os.environ["FSDP_BACKWARD_PREFETCH"] = "BACKWARD_PRE"
-    #     os.environ["FSDP_STATE_DICT_TYPE"] = "SHARDED_STATE_DICT"
-    #     os.environ["FSDP_OFFLOAD_PARAMS"] = "false"
-
-    # # # we use fsdp also when world size ==1. accelerate issue in casting
     if WORLD_SIZE > 1:
         os.environ["ACCELERATE_USE_FSDP"] = "true"
         os.environ["ACCELERATE_MIXED_PRECISION"] = "bf16"
@@ -330,7 +299,7 @@ def main():
     accelerator.print("model loaded. \n\n")
     sys.stdout.flush()
 
-    dataset, longest_seq = MMLU_Dataset(
+    dataset, longest_seq = mmlu_dataset(
         tokenizer=tokenizer,
         max_seq_len=max_seq_len,
         num_few_shots=args.num_few_shots,
