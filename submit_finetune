@@ -35,7 +35,7 @@ srun torchrun \
     --rdzv-id=$SLURM_PROCID \
     --rdzv-backend=c10d \
     --rdzv-endpoint=$head_node:0 \
-   open_instruct/finetune_fsdp.py \
+   open_instruct/finetune.py \
     --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/models/$folder/models_hf/$model_name \
     --use_lora \
     --lora_rank 64 \

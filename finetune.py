@@ -33,7 +33,7 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
 # *******************************************************************
 
 from utils.dataloader_utils import get_dataloader, DataCollatorForCausalLMEval
-from utils.helpers_extract import (
+from utils.helpers_finetune import (
     print_memory_consumed,
     save_with_accelerate,
     find_grad_accumulation_steps,
@@ -67,12 +67,6 @@ def parse_args():
         type=str,
         help="Path to pretrained model or model identifier from huggingface.co/models.",
         default=None,
-    )
-    parser.add_argument(
-        "--config_name",
-        type=str,
-        default=None,
-        help="Pretrained config name or path if not the same as model_name",
     )
     parser.add_argument(
         "--use_lora",
@@ -543,6 +537,27 @@ def main():
         accelerator.print("measuring baselines..")
         sys.stdout.flush()
 
+        acc = evaluate(
+            model=model,
+            dataloader=val_loader,
+            tokenizer=tokenizer,
+            subject_to_int=subject_to_int,
+            int_to_subject=int_to_subject,
+        )
+        print_memory_consumed(rank=RANK)
+        logger.info(
+            f"baseline mmlu val accuracy: macro {acc['macro']:.4f}, micro {acc['micro']:.4f}"
+        )
+        save_statistics(
+            train_stats,
+            stats,
+            0,
+            0,
+            output_dir,
+            filename,
+            acc_val=acc,
+        )
+
     accelerator.print("start training")
     accelerator.print("memory before train run")
     sys.stdout.flush()
@@ -633,7 +648,7 @@ def main():
                         train_stats,
                         stats,
                         completed_steps,
-                        epoch,
+                        epoch + 1,
                         output_dir,
                         filename,
                         loss=avg_loss,
@@ -656,7 +671,7 @@ def main():
                         train_stats,
                         stats,
                         completed_steps,
-                        epoch,
+                        epoch + 1,
                         output_dir,
                         filename,
                         acc_val=acc,
@@ -696,7 +711,7 @@ def main():
             train_stats,
             stats,
             completed_steps,
-            epoch,
+            epoch + 1,
             output_dir,
             filename,
             acc_test=acc,
