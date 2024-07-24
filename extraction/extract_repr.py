@@ -9,25 +9,25 @@ from accelerate.logging import get_logger
 
 import transformers
 import sys
-from utils.helpers import get_target_layers_llama, get_target_layers_mistral
+from utils.helpers_extract import get_target_layers
 from utils.model_utils import get_model
 from utils.dataloader_utils import get_dataloader
 from utils.dataset_utils import MMLU_Dataset
 from utils.tokenizer_utils import get_tokenizer
-from intrinsic_dimension.compute_distances import compute_id
+from extraction.compute_distances import estract_representations
 import torch
 import os
-from utils.helpers import print_memory_consumed, is_memory_enough
+from utils.helpers_extract import print_memory_consumed, is_memory_enough
 
+from functools import partial
 from accelerate import FullyShardedDataParallelPlugin
-from torch.distributed.fsdp.fully_sharded_data_parallel import (
-    FullOptimStateDictConfig,
-    FullStateDictConfig,
+from torch.distributed.fsdp import (
+    ShardingStrategy,
+    BackwardPrefetch,
 )
-import numpy as np
 
-
-import datetime
+from torch.distributed.fsdp.wrap import lambda_auto_wrap_policy
+from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 
 
 # # Get the current directory (root directory of the package)
@@ -37,8 +37,6 @@ import datetime
 # parent_dir = os.path.abspath(os.path.join(current_dir, ".."))
 # sys.path.insert(0, parent_dir)
 
-
-# from dataset_utils.utils import MMLU_Dataset
 
 logger = get_logger(__name__)
 
@@ -159,12 +157,6 @@ def parse_args():
         help="number_few_shots",
     )
     parser.add_argument(
-        "--num_samples",
-        type=int,
-        default=None,
-        help="number_few_shots",
-    )
-    parser.add_argument(
         "--precision",
         type=str,
         default="bf16",
@@ -208,32 +200,63 @@ def parse_args():
     return args
 
 
+def lambda_fn(module: torch.nn.Module):
+    if isinstance(module, LlamaDecoderLayer):
+        return True  # like transformer_auto_wrap_policy
+    if isinstance(module, torch.nn.Linear) and all(
+        p.requires_grad for p in module.parameters()
+    ):
+        return True  # wrap each trainable linear separately
+    return False
+
+
 def main():
     args = parse_args()
     # Initialize the accelerator. We will let the accelerator handle device placement for us in this example.
     # If we're using tracking, we also need to initialize it here and it will by default pick up all supported trackers
     # in the environment
 
-    os.environ["ACCELERATE_MIXED_PRECISION"] = args.precision
+    # os.environ["ACCELERATE_MIXED_PRECISION"] = args.precision
 
-    # we use fsdp also when world size ==1. accelerate issue in casting
-    if int(os.environ["WORLD_SIZE"]) > 0:
+    # # we use fsdp also when world size ==1. accelerate issue in casting
+    # if int(os.environ["WORLD_SIZE"]) > 0:
+    #     os.environ["ACCELERATE_USE_FSDP"] = "true"
+
+    #     os.environ["ACCELERATE_USE_FSDP"] = "true"
+
+    #     os.environ["FSDP_SHRDING_STRATEGY"] = "FULL_SHARD"
+    #     os.environ["FSDP_AUTO_WRAP_POLICY"] = "TRANSFORMER_BASED_WRAP"
+    #     if args.model_name.startswith("llama"):
+    #         os.environ["FSDP_TRANSFORMER_CLS_TO_WRAP"] = "LlamaDecoderLayer"
+    #     elif args.model_name.startswith("mistral"):
+    #         os.environ["FSDP_TRANSFORMER_CLS_TO_WRAP"] = "MistralDecoderLayer"
+
+    #     os.environ["FSDP_BACKWARD_PREFETCH"] = "BACKWARD_PRE"
+    #     os.environ["FSDP_STATE_DICT_TYPE"] = "SHARDED_STATE_DICT"
+    #     os.environ["FSDP_OFFLOAD_PARAMS"] = "false"
+
+    # # # we use fsdp also when world size ==1. accelerate issue in casting
+    if WORLD_SIZE > 1:
         os.environ["ACCELERATE_USE_FSDP"] = "true"
+        os.environ["ACCELERATE_MIXED_PRECISION"] = "bf16"
 
-        os.environ["ACCELERATE_USE_FSDP"] = "true"
+    auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
 
-        os.environ["FSDP_SHRDING_STRATEGY"] = "FULL_SHARD"
-        os.environ["FSDP_AUTO_WRAP_POLICY"] = "TRANSFORMER_BASED_WRAP"
-        if args.model_name.startswith("llama"):
-            os.environ["FSDP_TRANSFORMER_CLS_TO_WRAP"] = "LlamaDecoderLayer"
-        elif args.model_name.startswith("mistral"):
-            os.environ["FSDP_TRANSFORMER_CLS_TO_WRAP"] = "MistralDecoderLayer"
+    fsdp_plugin = FullyShardedDataParallelPlugin(
+        sharding_strategy=ShardingStrategy.FULL_SHARD,
+        backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
+        auto_wrap_policy=auto_wrap_policy,
+        cpu_offload=False,
+        ignored_modules=None,
+        limit_all_gathers=True,
+        use_orig_params=True,
+        param_init_fn=None,
+        sync_module_states=True,
+        forward_prefetch=False,
+        activation_checkpointing=False,
+    )
 
-        os.environ["FSDP_BACKWARD_PREFETCH"] = "BACKWARD_PRE"
-        os.environ["FSDP_STATE_DICT_TYPE"] = "SHARDED_STATE_DICT"
-        os.environ["FSDP_OFFLOAD_PARAMS"] = "false"
-
-    accelerator = Accelerator(mixed_precision=args.precision)
+    accelerator = Accelerator(fsdp_plugin=fsdp_plugin)
 
     # accelerator = Accelerator()
     # Make one log on every process with the configuration for debugging.
@@ -254,17 +277,11 @@ def main():
         os.makedirs(args.out_dir, exist_ok=True)
 
     accelerator.wait_for_everyone()
-    world_size = accelerator.num_processes
-    if world_size > 1:
+    if WORLD_SIZE > 1:
         args.micro_batch_size = 1
         accelerator.print(
             f"world size = {args.micro_batch_size}. Setting micro_batch_size =1"
         )
-
-    # if args.checkpoint_dir is not None:
-    #    model_name_tmp = args.checkpoint_dir.split("/")[-1]
-    #    if model_name_tmp.startswith("llama-2") or model_name_tmp.startswith("llama-3"):
-    #        model_name = model_name_tmp
 
     if args.checkpoint_dir is None:
         model_name = args.model_name
@@ -313,9 +330,6 @@ def main():
     accelerator.print("model loaded. \n\n")
     sys.stdout.flush()
 
-    if args.random_subject:
-        args.num_few_shots = 5
-
     dataset, longest_seq = MMLU_Dataset(
         tokenizer=tokenizer,
         max_seq_len=max_seq_len,
@@ -323,36 +337,10 @@ def main():
         accelerator=accelerator,
         subject=None,
         num_processes=args.preprocessing_num_workers,
-        num_samples=args.num_samples,
         split=args.split,
-        dummy=args.dummy,
-        gibberish=args.gibberish,
-        random_subject=args.random_subject,
-        wrong_answers=args.wrong_answers,
-        sample_questions=args.sample_questions,
-        declarative=args.declarative,
         aux_few_shot=args.aux_few_shot,
-        only_question=args.only_question,
-        only_answer=args.only_answer,
-        skip_answer=args.skip_answer,
-        skip_choices=args.skip_choices,
         random_order=args.random_order,
     ).construct_dataset()
-
-    # print(dataset[0]["prompt"])
-    # print(len(dataset))
-    # assert False
-
-    time_stamp = None
-    if args.prompt_search:
-        # mask = np.load("diego/analysis/test_mask_100.npy")
-        # dataset = dataset.select(mask)
-        # assert len(dataset) == 5700
-
-        time_stamp = datetime.datetime.now().__str__().split(" ")[1][:8]
-        with open(f"prompt_search_{time_stamp}.txt", "w") as f:
-            f.write(f"prompt template:\n")
-            f.write(f"{dataset[0]['prompt']}\n\n")
 
     accelerator.print("num few shots:", args.num_few_shots)
     accelerator.print("max_seq_len:", len(longest_seq["input_ids"][0]))
@@ -362,7 +350,7 @@ def main():
         args.micro_batch_size,
         pad_token_id,
         max_seq_len=max_seq_len,
-        world_size=world_size,
+        world_size=WORLD_SIZE,
         shuffle=False,
         num_processes=args.preprocessing_num_workers,
     )
@@ -372,68 +360,39 @@ def main():
     # Put the model on with `accelerator`.
     print_memory_consumed(accelerator.process_index)
     model = accelerator.prepare(model)
-    accelerator.print("model put to gpus")
-
+    accelerator.print("model loaded to gpus")
     print_memory_consumed(accelerator.process_index)
 
     # just few forward passes with the longest sequences
     accelerator.print("testing longest seq fints into memory..")
     sys.stdout.flush()
-
     is_memory_enough(
-        model, longest_seq, args.micro_batch_size, pad_token_id, max_seq_len, world_size
+        model, longest_seq, args.micro_batch_size, pad_token_id, max_seq_len, WORLD_SIZE
     )
-    accelerator.print("done")
     print_memory_consumed(accelerator.process_index)
     sys.stdout.flush()
 
-    if model_name.startswith("llama"):
-        target_layers = get_target_layers_llama(
-            model=model,
-            n_layer=n_layer,
-            option=args.target_layer,
-            every=args.layer_interval,
-            world_size=accelerator.num_processes,
-            finetuned=is_finetuned,
-        )
-
-    elif model_name.startswith("mistral"):
-        target_layers = get_target_layers_mistral(
-            model=model,
-            n_layer=n_layer,
-            option=args.target_layer,
-            every=args.layer_interval,
-            world_size=accelerator.num_processes,
-            finetuned=is_finetuned,
-        )
+    target_layers = get_target_layers(
+        model=model,
+        n_layer=n_layer,
+        option=args.target_layer,
+        every=args.layer_interval,
+        world_size=WORLD_SIZE,
+        finetuned=is_finetuned,
+    )
 
     nsamples = len(dataloader.dataset)
     accelerator.print("num_total_samples", nsamples)
 
-    inner_path = f"evaluated_{args.split}/{model_name}/{args.num_few_shots}shot"
-    if args.dummy:
-        inner_path = f"evaluated_{args.split}/dummy/{model_name}/5shot"
-    elif args.gibberish:
-        inner_path = f"evaluated_{args.split}/gibberish/{model_name}/5shot"
-    elif args.random_subject:
-        inner_path = f"evaluated_{args.split}/random_subject/{model_name}/{args.num_few_shots}shot"
-    elif args.wrong_answers:
-        inner_path = f"evaluated_{args.split}/wrong_answers/{model_name}/{args.num_few_shots}shot"
-    elif args.sample_questions:
-        inner_path = f"evaluated_{args.split}/questions_sampled13/{model_name}/{args.num_few_shots}shot"
-    elif args.random_order:
-        inner_path = (
-            f"evaluated_{args.split}/random_order/{model_name}/{args.num_few_shots}shot"
-        )
-    elif args.declarative:
-        inner_path = (
-            f"evaluated_{args.split}/declarative/{model_name}/{args.num_few_shots}shot"
-        )
-    elif args.finetuned_path:
+    inner_path = (
+        f"evaluated_{args.split}/random_order/{model_name}/{args.num_few_shots}shot"
+    )
+
+    if args.finetuned_path:
         inner_path = f"finetuned_{args.finetuned_mode}/evaluated_{args.split}/{model_name}/{args.finetuned_epochs}epochs/{ckpt}"
 
     dirpath = args.out_dir + f"/{inner_path}"
-    compute_id(
+    estract_representations(
         accelerator=accelerator,
         model=model,
         dataloader=dataloader,
@@ -447,10 +406,10 @@ def main():
         save_distances=args.save_distances,
         save_repr=args.save_repr,
         print_every=args.logging_steps,
-        prompt_search=args.prompt_search,
-        time_stamp=time_stamp,
     )
 
 
 if __name__ == "__main__":
+    WORLD_SIZE = int(os.environ["WORLD_SIZE"])
+    RANK = int(os.environ["RANK"])
     main()

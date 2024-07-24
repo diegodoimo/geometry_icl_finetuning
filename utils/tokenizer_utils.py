@@ -1,4 +1,4 @@
-from transformers import AutoTokenizer, LlamaTokenizer
+from transformers import AutoTokenizer
 
 
 def get_tokenizer(tokenizer_path=None, model_path=None):
@@ -10,16 +10,7 @@ def get_tokenizer(tokenizer_path=None, model_path=None):
         tokenizer_path, use_fast=False
     )  # check what happens when true
 
-    # num_added_tokens = tokenizer.add_special_tokens(
-    #    {
-    #        "pad_token": "<pad>",
-    #    }
-    # )
-    # assert num_added_tokens in [
-    #    0,
-    #    1,
-    # ], "LlamaTokenizer should only add one special token - the pad_token, or no tokens if pad token present."
     tokenizer.pad_token = "<pad>"
     tokenizer.pad_token_id = tokenizer.eos_token_id
-    # resize_model_embeddings(model, tokenizer)
+
     return tokenizer

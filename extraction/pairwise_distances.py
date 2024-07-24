@@ -6,10 +6,10 @@ import copy
 
 
 def compute_distances(
-    X,
+    x,
     n_neighbors,
     range_scaling=None,
-    Y=None,
+    y=None,
     working_memory=1024,
     n_jobs=1,
     argsort=False,
@@ -41,12 +41,12 @@ def compute_distances(
     )
 
     kwds = {"squared": True}
-    if Y is None:
-        Y = X
+    if y is None:
+        y = x
     chunked_results = list(
         pairwise_distances_chunked(
-            X,
-            Y,
+            x,
+            y,
             reduce_func=reduce_func,
             metric="euclidean",
             n_jobs=n_jobs,
@@ -81,7 +81,7 @@ def _kneighbors_reduce_func(
     dist : ndarray of shape (n_samples_chunk, n_samples)
             The distance matrix.
     start : int
-            The index in X which the first row of dist corresponds to.
+            The index in x which the first row of dist corresponds to.
     n_neighbors : int
             Number of neighbors required for each sample.
     return_distance : bool
