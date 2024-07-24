@@ -212,14 +212,6 @@ class extract_activations:
 
         if is_last_batch:
 
-            # print("act_tmp shape", self.rank, act_tmp.shape)
-            # print("hidden_states_shape", self.rank, self.hidden_states[name].shape)
-            # print("hidden_states_shape",self.rank,
-            #         self.hidden_states[name][self.hidden_size :].shape,
-            # )
-            # sys.stdout.flush()
-            # self.hidden_states[name] = torch.cat((self.hidden_states[name][: self.hidden_size], act_tmp), dim=0
-            #     )
             self.hidden_states[name][self.hidden_size :] = act_tmp
 
         else:
@@ -291,11 +283,6 @@ class extract_activations:
 
                 else:
                     seq_len = self._update_hidden_state(mask.cpu(), is_last_batch)
-
-                # this outputs a (world_size x batch_size) x embedding matrix
-                # for the current implementation recall that when world size > 1 batch size must be ==1.
-                # seq_len = torch.sum(mask, dim=1)
-                # logits, targets = self.all_gather_logits(outputs.logits, seq_len, targets)
 
             seq_len = torch.sum(mask, dim=1)
             logits, targets = self.all_gather_logits(outputs.logits, targets, seq_len)
