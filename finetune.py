@@ -267,36 +267,37 @@ def main():
     )
 
 
-    fsdp_plugin=None
+    
     # # # we use fsdp also when world size ==1. accelerate issue in casting
-    if WORLD_SIZE > 1:
-        os.environ["ACCELERATE_USE_FSDP"] = "true"
-        os.environ["ACCELERATE_MIXED_PRECISION"] = "bf16"
+    #if WORLD_SIZE > 1:
 
-        def lambda_fn(module: torch.nn.Module):
-            if isinstance(module, LlamaDecoderLayer):
-                return True  # like transformer_auto_wrap_policy
-            if isinstance(module, torch.nn.Linear) and all(
-                p.requires_grad for p in module.parameters()
-            ):
-                return True  # wrap each trainable linear separately
-            return False
+    os.environ["ACCELERATE_USE_FSDP"] = "true"
+    os.environ["ACCELERATE_MIXED_PRECISION"] = "bf16"
 
-        auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
+    def lambda_fn(module: torch.nn.Module):
+        if isinstance(module, LlamaDecoderLayer):
+            return True  # like transformer_auto_wrap_policy
+        if isinstance(module, torch.nn.Linear) and all(
+            p.requires_grad for p in module.parameters()
+        ):
+            return True  # wrap each trainable linear separately
+        return False
 
-        fsdp_plugin = FullyShardedDataParallelPlugin(
-            sharding_strategy=ShardingStrategy.FULL_SHARD,
-            backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
-            auto_wrap_policy=auto_wrap_policy,
-            cpu_offload=False,
-            ignored_modules=None,
-            limit_all_gathers=True,
-            use_orig_params=True,
-            param_init_fn=None,
-            sync_module_states=True,
-            forward_prefetch=False,
-            activation_checkpointing=False,
-        )
+    auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
+
+    fsdp_plugin = FullyShardedDataParallelPlugin(
+        sharding_strategy=ShardingStrategy.FULL_SHARD,
+        backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
+        auto_wrap_policy=auto_wrap_policy,
+        cpu_offload=False,
+        ignored_modules=None,
+        limit_all_gathers=True,
+        use_orig_params=True,
+        param_init_fn=None,
+        sync_module_states=True,
+        forward_prefetch=False,
+        activation_checkpointing=False,
+    )
 
 
     accelerator = Accelerator(
