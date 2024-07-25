@@ -28,20 +28,19 @@ nodes_array=($nodes)
 head_node=${nodes_array[0]}
 head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
 
-echo $SLURM_GPUS
-
+# for some reason the $SLURM_GPUS is empty. We use another way to count the gpus per node used below. 
 srun torchrun \
     --nnodes=$SLURM_NTASKS \
     --node-rank=$SLURM_NODEID \
-    --nproc-per-node=$SLURM_GPUS \
+    --nproc-per-node=$(echo $CUDA_VISIBLE_DEVICES | tr ',' ' ' | wc -w) \
     --rdzv-id=$SLURM_PROCID \
     --rdzv-backend=c10d \
     --rdzv-endpoint=$head_node:0 \
    open_instruct/finetune.py \
     --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/models/$folder/models_hf/$model_name \
     --use_lora \
-    --lora_rank 64 \
-    --lora_alpha 16 \
+    --lora_rank 128 \
+    --lora_alpha 32 \
     --lora_dropout 0.1 \
     --tokenizer_name /orfeo/cephfs/scratch/area/ddoimo/models/$folder/models_hf/$model_name \
     --use_slow_tokenizer \
@@ -67,7 +66,10 @@ srun torchrun \
     --logging_steps 20 \
     --eval_steps 10 \
     --use_flash_attn \
+    --measure_baselines \
     --activation_checkpointing \
     --weight_samples \
     --save_checkpoint \
-    --seed 0
+    --seed 2 
+
+
