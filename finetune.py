@@ -251,6 +251,16 @@ def parse_args():
     parser.add_argument("--weight_samples", action="store_true")
     args = parser.parse_args()
 
+    # Sanity checks
+    if args.dataset_name is None and args.train_file is None:
+        raise ValueError("Need either a dataset name or a training file.")
+    else:
+        if args.train_file is not None:
+            extension = args.train_file.split(".")[-1]
+            assert extension in [
+                "json",
+                "jsonl",
+            ], "`train_file` should be a json/jsonl file."
     return args
 
 
@@ -562,7 +572,7 @@ def main():
         sys.stdout.flush()
         save_with_accelerate(accelerator, model, output_dir, args)
 
-    train_stats = defaultdict()
+    train_stats = defaultdict(dict)
     if args.measure_baselines:
         accelerator.print("measuring baselines..")
         sys.stdout.flush()
