@@ -251,16 +251,6 @@ def parse_args():
     parser.add_argument("--weight_samples", action="store_true")
     args = parser.parse_args()
 
-    # Sanity checks
-    if args.dataset_name is None and args.train_file is None:
-        raise ValueError("Need either a dataset name or a training file.")
-    else:
-        if args.train_file is not None:
-            extension = args.train_file.split(".")[-1]
-            assert extension in [
-                "json",
-                "jsonl",
-            ], "`train_file` should be a json/jsonl file."
     return args
 
 
