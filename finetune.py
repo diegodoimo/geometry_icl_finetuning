@@ -629,6 +629,7 @@ def main():
         optimizer.zero_grad()
         if WORLD_SIZE > 1:
             sampler.set_epoch(epoch)
+
         for _, batch in enumerate(train_loader):
 
             with accelerator.accumulate(model):
@@ -720,7 +721,7 @@ def main():
                     if args.output_dir is not None:
                         output_dir = os.path.join(args.output_dir, output_dir)
                     save_with_accelerate(accelerator, model, output_dir, args)
-                    
+                    accelerator.print("check saved")
 
                 if completed_steps >= args.max_train_steps:
                     break
