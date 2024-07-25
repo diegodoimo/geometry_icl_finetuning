@@ -276,10 +276,8 @@ def main():
         args=args, world_size=WORLD_SIZE
     )
 
-    accelerator = Accelerator(
-        gradient_accumulation_steps=args.gradient_accumulation_steps,
-    )
 
+    fsdp_plugin=None
     # # # we use fsdp also when world size ==1. accelerate issue in casting
     if WORLD_SIZE > 1:
         os.environ["ACCELERATE_USE_FSDP"] = "true"
@@ -310,10 +308,11 @@ def main():
             activation_checkpointing=False,
         )
 
-        accelerator = Accelerator(
-            gradient_accumulation_steps=gradient_accumulation_steps,
-            fsdp_plugin=fsdp_plugin,
-        )
+
+    accelerator = Accelerator(
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        fsdp_plugin=fsdp_plugin
+    )
 
     # def lambda_fn(module: torch.nn.Module):
     #     if isinstance(module, LlamaDecoderLayer):
