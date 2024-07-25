@@ -277,8 +277,11 @@ def main():
 
     auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
 
+    sharding_strategy=ShardingStrategy.NO_SHARD
+    if WORLD_SIZE > 1:
+        sharding_strategy=ShardingStrategy.FULL_SHARD
     fsdp_plugin = FullyShardedDataParallelPlugin(
-        sharding_strategy=ShardingStrategy.FULL_SHARD,
+        sharding_strategy=sharding_strategy,
         backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
         auto_wrap_policy=auto_wrap_policy,
         cpu_offload=False,
@@ -506,7 +509,6 @@ def main():
     stats = defaultdict()
     stats["num_epochs"] = args.num_train_epochs
     stats["lr"] = args.learning_rate
-    stats["scheduler"] = args.lr_scheduler_type
     stats["batch_size"] = args.batch_size
     stats["weight_decay"] = args.weight_decay
     stats["lora_rank"] = args.lora_rank
