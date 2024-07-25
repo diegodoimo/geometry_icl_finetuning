@@ -61,7 +61,6 @@ srun torchrun \
     --logging_steps 20 \
     --eval_steps 10 \
     --use_flash_attn \
-    --measure_baselines \
     --activation_checkpointing \
     --weight_samples \
     --save_checkpoint \
