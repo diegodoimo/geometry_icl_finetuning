@@ -424,6 +424,7 @@ def main():
         max_seq_len = args.max_seq_length
     accelerator.print("max_seq_len: ", max_seq_len)
 
+    accelerator.print("preparing training set")
     train_dataset, _ = mmlu_dataset(
         tokenizer=tokenizer,
         max_seq_len=max_seq_len,
@@ -434,6 +435,7 @@ def main():
     ).construct_dataset()
     accelerator.print(f"num_samples = {len(train_dataset)}")
 
+    accelerator.print("preparing validation set")
     val_dataset, _ = mmlu_dataset(
         tokenizer=tokenizer,
         max_seq_len=max_seq_len,
@@ -442,6 +444,7 @@ def main():
         split="validation",
     ).construct_dataset()
 
+    accelerator.print("preparing test set")
     test_dataset, _ = mmlu_dataset(
         tokenizer=tokenizer,
         max_seq_len=max_seq_len,
@@ -450,8 +453,7 @@ def main():
         split="test",
     ).construct_dataset()
 
-    global int_to_subject
-    global subject_to_int
+
     int_to_subject = {
         i: subject for i, subject in enumerate(np.unique(test_dataset["subjects"]))
     }

@@ -327,7 +327,6 @@ class mmlu_dataset:
             return example
 
         tokenized_dataset = tokenized_dataset.map(truncate_from_left)
-        self.accelerator.print("after_truncation")
         tokenized_dataset.set_format(type="pt")
         _ = filter_out_long_sequences(tokenized_dataset, self.max_seq_len)
 
