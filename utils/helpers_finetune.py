@@ -74,7 +74,9 @@ def save_with_accelerate(accelerator, model, output_dir, args):
     # Otherwise, sometimes the model will be saved with only part of the parameters.
     # Also, accelerator needs to use the wrapped model to get the state_dict.
     state_dict = accelerator.get_state_dict(model)
+    accelerator.print("state_dict loaded")
     if args.use_lora:
+        accelerator.print("actual saving done")
         # When using lora, the unwrapped model is a PeftModel, which doesn't support the is_main_process
         # and has its own save_pretrained function for only saving lora modules.
         # We have to manually specify the is_main_process outside the save_pretrained function.
