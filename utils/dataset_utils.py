@@ -271,6 +271,7 @@ class mmlu_dataset:
         else:
             dataset = load_dataset("cais/mmlu", "all", split=split)
 
+        few_shot_dataset = None
         if self.num_few_shots > 0:
             if self.num_few_shot > 5:
                 assert False
