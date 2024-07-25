@@ -629,7 +629,7 @@ def main():
         optimizer.zero_grad()
         if WORLD_SIZE > 1:
             sampler.set_epoch(epoch)
-        for batch in train_loader:
+        for _, batch in enumerate(train_loader):
 
             with accelerator.accumulate(model):
                 batch = {key: val.to("cuda") for key, val in batch.items()}
