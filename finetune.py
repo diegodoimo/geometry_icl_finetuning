@@ -271,47 +271,86 @@ def main():
     # If we're using tracking, we also need to initialize it here and it will by default pick up all supported trackers
     # in the environment
 
-    # # # we use fsdp also when world size ==1. accelerate issue in casting
-    if WORLD_SIZE > 1:
-        os.environ["ACCELERATE_USE_FSDP"] = "true"
-        os.environ["ACCELERATE_MIXED_PRECISION"] = "bf16"
-
-    def lambda_fn(module: torch.nn.Module):
-        if isinstance(module, LlamaDecoderLayer):
-            return True  # like transformer_auto_wrap_policy
-        if isinstance(module, torch.nn.Linear) and all(
-            p.requires_grad for p in module.parameters()
-        ):
-            return True  # wrap each trainable linear separately
-        return False
-
-    auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
-
-    sharding_strategy=ShardingStrategy.NO_SHARD
-    if WORLD_SIZE > 1:
-        sharding_strategy=ShardingStrategy.FULL_SHARD
-    fsdp_plugin = FullyShardedDataParallelPlugin(
-        sharding_strategy=sharding_strategy,
-        backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
-        auto_wrap_policy=auto_wrap_policy,
-        cpu_offload=False,
-        ignored_modules=None,
-        limit_all_gathers=True,
-        use_orig_params=True,
-        param_init_fn=None,
-        sync_module_states=True,
-        forward_prefetch=False,
-        activation_checkpointing=False,
-    )
 
     gradient_accumulation_steps, args.batch_size = find_grad_accumulation_steps(
         args=args, world_size=WORLD_SIZE
     )
 
     accelerator = Accelerator(
-        gradient_accumulation_steps=gradient_accumulation_steps,
-        fsdp_plugin=fsdp_plugin,
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
     )
+
+    # # # we use fsdp also when world size ==1. accelerate issue in casting
+    if WORLD_SIZE > 1:
+        os.environ["ACCELERATE_USE_FSDP"] = "true"
+        os.environ["ACCELERATE_MIXED_PRECISION"] = "bf16"
+
+        def lambda_fn(module: torch.nn.Module):
+            if isinstance(module, LlamaDecoderLayer):
+                return True  # like transformer_auto_wrap_policy
+            if isinstance(module, torch.nn.Linear) and all(
+                p.requires_grad for p in module.parameters()
+            ):
+                return True  # wrap each trainable linear separately
+            return False
+
+        auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
+
+        fsdp_plugin = FullyShardedDataParallelPlugin(
+            sharding_strategy=ShardingStrategy.FULL_SHARD,
+            backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
+            auto_wrap_policy=auto_wrap_policy,
+            cpu_offload=False,
+            ignored_modules=None,
+            limit_all_gathers=True,
+            use_orig_params=True,
+            param_init_fn=None,
+            sync_module_states=True,
+            forward_prefetch=False,
+            activation_checkpointing=False,
+        )
+
+        accelerator = Accelerator(
+            gradient_accumulation_steps=gradient_accumulation_steps,
+            fsdp_plugin=fsdp_plugin,
+        )
+
+    # def lambda_fn(module: torch.nn.Module):
+    #     if isinstance(module, LlamaDecoderLayer):
+    #         return True  # like transformer_auto_wrap_policy
+    #     if isinstance(module, torch.nn.Linear) and all(
+    #         p.requires_grad for p in module.parameters()
+    #     ):
+    #         return True  # wrap each trainable linear separately
+    #     return False
+
+    # auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
+
+    # sharding_strategy=ShardingStrategy.NO_SHARD
+    # if WORLD_SIZE > 1:
+    #     sharding_strategy=ShardingStrategy.FULL_SHARD
+    # fsdp_plugin = FullyShardedDataParallelPlugin(
+    #     sharding_strategy=sharding_strategy,
+    #     backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
+    #     auto_wrap_policy=auto_wrap_policy,
+    #     cpu_offload=False,
+    #     ignored_modules=None,
+    #     limit_all_gathers=True,
+    #     use_orig_params=True,
+    #     param_init_fn=None,
+    #     sync_module_states=True,
+    #     forward_prefetch=False,
+    #     activation_checkpointing=False,
+    # )
+
+    # gradient_accumulation_steps, args.batch_size = find_grad_accumulation_steps(
+    #     args=args, world_size=WORLD_SIZE
+    # )
+
+    # accelerator = Accelerator(
+    #     gradient_accumulation_steps=gradient_accumulation_steps,
+    #     fsdp_plugin=fsdp_plugin,
+    # )
     # Make one log on every process with the configuration for debugging.
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -551,14 +590,15 @@ def main():
             f"baseline mmlu val accuracy: macro {acc['macro']:.4f}, micro {acc['micro']:.4f}"
         )
         save_statistics(
-            train_stats,
-            stats,
-            0,
-            0,
-            output_dir,
-            filename,
+            train_stats=train_stats,
+            stats=stats,
+            completed_steps=0,
+            epoch=0,
+            results_dir=output_dir,
+            filename=filename,
             acc_val=acc,
         )
+
 
     accelerator.print("start training")
     accelerator.print("memory before train run")
@@ -731,7 +771,7 @@ def evaluate(model, dataloader, tokenizer, subject_to_int, int_to_subject):
     for iter_num, batch in enumerate(dataloader):
 
         if (iter_num + 1) % int(
-            1000 / (dataloader.batch_size * WORLD_SIZE)
+            500 / (dataloader.batch_size * WORLD_SIZE)
         ) == 0 and RANK == 0:
             print(
                 f"{iter_num * dataloader.batch_size*WORLD_SIZE+1}/ {len(dataloader.dataset)} inputs processed"
