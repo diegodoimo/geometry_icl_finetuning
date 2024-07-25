@@ -1,14 +1,14 @@
 #!/bin/bash
 #SBATCH --partition=DGX
 #SBATCH --account=lade
-#SBATCH --nodelist=dgx002
+##SBATCH --nodelist=dgx001
 #SBATCH --nodes=1
 #SBATCH --time=20:00:00            
 #SBATCH --ntasks-per-node=1       
 #SBATCH --cpus-per-task=128          
-#SBATCH --mem=600G  #it is intended per node          
+#SBATCH --mem=100G  #it is intended per node          
 #SBATCH --job-name=test
-#SBATCH --gres=gpu:8 #it is intended per node
+#SBATCH --gres=gpu:1 #it is intended per node
 
 source /u/area/ddoimo/anaconda3/bin/activate ./env_amd_new
 
@@ -18,7 +18,7 @@ export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 TOTAL_BATCH_SIZE=16
 BATCH_SIZE_PER_GPU=1
 
-model_name="llama-3-70b"
+model_name="llama-3-8b"
 samples_per_subject=20
 folder="llama_v3"
 
@@ -28,18 +28,19 @@ nodes_array=($nodes)
 head_node=${nodes_array[0]}
 head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
 
+# for some reason the $SLURM_GPUS is empty. We use another way to count the gpus per node used below. 
 srun torchrun \
     --nnodes=$SLURM_NTASKS \
     --node-rank=$SLURM_NODEID \
-    --nproc-per-node=$SLURM_GPUS \
+    --nproc-per-node=$(echo $CUDA_VISIBLE_DEVICES | tr ',' ' ' | wc -w) \
     --rdzv-id=$SLURM_PROCID \
     --rdzv-backend=c10d \
     --rdzv-endpoint=$head_node:0 \
-   open_instruct/finetune.py \
+   open_instruct/finetune_fsdp_multinode.py \
     --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/models/$folder/models_hf/$model_name \
     --use_lora \
-    --lora_rank 64 \
-    --lora_alpha 16 \
+    --lora_rank 128 \
+    --lora_alpha 32 \
     --lora_dropout 0.1 \
     --tokenizer_name /orfeo/cephfs/scratch/area/ddoimo/models/$folder/models_hf/$model_name \
     --use_slow_tokenizer \
@@ -65,7 +66,10 @@ srun torchrun \
     --logging_steps 20 \
     --eval_steps 10 \
     --use_flash_attn \
+    --measure_baselines \
     --activation_checkpointing \
     --weight_samples \
     --save_checkpoint \
-    --seed 0
+    --seed 2 
+
+
