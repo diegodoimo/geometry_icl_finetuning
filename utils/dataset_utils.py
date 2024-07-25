@@ -27,9 +27,7 @@ def filter_out_long_sequences(tokenized_dataset, max_seq_len):
             f"you filter out {diff} examples, {diff/tot_examples*100: .2f}% of the total"
         )
         sys.stdout.flush()
-    else:
-        print(f"there are no sequences longer than {max_seq_len}")
-        sys.stdout.flush()
+
 
 
 def format_subject(subject):
