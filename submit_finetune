@@ -1,16 +1,16 @@
 #!/bin/bash
 #SBATCH --partition=DGX
 #SBATCH --account=lade
-#SBATCH --nodelist=dgx002
+##SBATCH --nodelist=dgx002
 #SBATCH --nodes=1
-#SBATCH --time=20:00:00            
+#SBATCH --time=4:00:00            
 #SBATCH --ntasks-per-node=1       
-#SBATCH --cpus-per-task=128          
-#SBATCH --mem=600G  #it is intended per node          
+#SBATCH --cpus-per-task=32          
+#SBATCH --mem=100G  #it is intended per node          
 #SBATCH --job-name=test
-#SBATCH --gres=gpu:8 #it is intended per node
+#SBATCH --gres=gpu:1 #it is intended per node
 
-source /u/area/ddoimo/anaconda3/bin/activate ./env_amd_new
+source /u/area/ddoimo/anaconda3/bin/activate ./env_amd
 
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True" 
@@ -18,7 +18,7 @@ export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 TOTAL_BATCH_SIZE=16
 BATCH_SIZE_PER_GPU=1
 
-model_name="llama-3-70b"
+model_name="llama-3-8b"
 samples_per_subject=20
 folder="llama_v3"
 
@@ -27,6 +27,8 @@ nodes=( $( scontrol show hostnames $SLURM_JOB_NODELIST ) )
 nodes_array=($nodes)
 head_node=${nodes_array[0]}
 head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
+
+echo $SLURM_GPUS
 
 srun torchrun \
     --nnodes=$SLURM_NTASKS \
