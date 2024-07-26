@@ -29,7 +29,6 @@ def filter_out_long_sequences(tokenized_dataset, max_seq_len):
         sys.stdout.flush()
 
 
-
 def format_subject(subject):
     l = subject.split("_")
     s = ""
@@ -68,7 +67,6 @@ class mmlu_dataset:
         self.samples_per_subject = samples_per_subject
 
     # ****************************************************
-    # common
     def construct_question(self, question, choices, answer, include_answer=False):
         # added strip
         prompt = f"{question.strip()}\n"
