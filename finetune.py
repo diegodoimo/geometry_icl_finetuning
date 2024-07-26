@@ -261,15 +261,12 @@ def main():
     # If we're using tracking, we also need to initialize it here and it will by default pick up all supported trackers
     # in the environment
 
-
     gradient_accumulation_steps, args.batch_size = find_grad_accumulation_steps(
         args=args, world_size=WORLD_SIZE
     )
 
-
-    
     # # # we use fsdp also when world size ==1. accelerate issue in casting
-    #if WORLD_SIZE > 1:
+    # if WORLD_SIZE > 1:
 
     os.environ["ACCELERATE_USE_FSDP"] = "true"
     os.environ["ACCELERATE_MIXED_PRECISION"] = "bf16"
@@ -299,10 +296,8 @@ def main():
         activation_checkpointing=False,
     )
 
-
     accelerator = Accelerator(
-        gradient_accumulation_steps=gradient_accumulation_steps,
-        fsdp_plugin=fsdp_plugin
+        gradient_accumulation_steps=gradient_accumulation_steps, fsdp_plugin=fsdp_plugin
     )
 
     # def lambda_fn(module: torch.nn.Module):
@@ -454,7 +449,6 @@ def main():
         split="test",
     ).construct_dataset()
 
-
     int_to_subject = {
         i: subject for i, subject in enumerate(np.unique(test_dataset["subjects"]))
     }
@@ -533,6 +527,7 @@ def main():
     args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
     optimizer = get_optimizer(model, args)
     lr_scheduler, warmup_steps = get_scheduler(optimizer, args)
+    optimizer, lr_scheduler = accelerator.prepare(optimizer, lr_scheduler)
 
     # ***********************************************************************************
     filename = ""
@@ -590,7 +585,6 @@ def main():
             filename=filename,
             acc_val=acc,
         )
-
 
     accelerator.print("start training")
     accelerator.print("memory before train run")
@@ -741,7 +735,7 @@ def main():
             int_to_subject=int_to_subject,
         )
         logger.info(
-            f"iter {completed_steps}. mmlu val accuracy: macro {acc['macro']:.4f}, micro {acc['micro']:.4f}"
+            f"iter {completed_steps}. mmlu test accuracy: macro {acc['macro']:.4f}, micro {acc['micro']:.4f}"
         )
         save_statistics(
             train_stats,
@@ -765,7 +759,7 @@ def evaluate(model, dataloader, tokenizer, subject_to_int, int_to_subject):
     for iter_num, batch in enumerate(dataloader):
 
         if (iter_num + 1) % int(
-            500 / (dataloader.batch_size * WORLD_SIZE)
+            100 / (dataloader.batch_size * WORLD_SIZE)
         ) == 0 and RANK == 0:
             print(
                 f"{iter_num * dataloader.batch_size*WORLD_SIZE+1}/ {len(dataloader.dataset)} inputs processed"
