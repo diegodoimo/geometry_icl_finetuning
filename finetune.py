@@ -684,7 +684,7 @@ def main():
                         stats,
                         completed_steps,
                         epoch + 1,
-                        output_dir,
+                        args.output_dir,
                         filename,
                         loss=avg_loss,
                     )
@@ -707,7 +707,7 @@ def main():
                         stats,
                         completed_steps,
                         epoch + 1,
-                        output_dir,
+                        args.output_dir,
                         filename,
                         acc_val=acc,
                     )
@@ -748,7 +748,7 @@ def main():
             stats,
             completed_steps,
             epoch + 1,
-            output_dir,
+            args.output_dir,
             filename,
             acc_test=acc,
         )
