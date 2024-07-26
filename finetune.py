@@ -6,6 +6,7 @@ import logging
 import math
 import os
 import datasets
+import warnings
 import torch
 from accelerate import Accelerator
 from accelerate.logging import get_logger
@@ -249,6 +250,7 @@ def parse_args():
     parser.add_argument("--save_checkpoint", action="store_true")
     parser.add_argument("--eval_only", action="store_true")
     parser.add_argument("--weight_samples", action="store_true")
+    parser.add_argument("--macro_accuracy", action="store_true")
     args = parser.parse_args()
 
     return args
@@ -560,8 +562,15 @@ def main():
         sys.stdout.flush()
         save_with_accelerate(accelerator, model, output_dir, args)
 
+    if args.compute_macro_accuracy:
+        warnings.warn("computing macro accuracy will slow down the forward pass.")
+
     train_stats = defaultdict(dict)
     if args.measure_baselines:
+        output_dir = ""
+        if args.output_dir is not None:
+            output_dir = os.path.join(args.output_dir, output_dir)
+
         accelerator.print("measuring baselines..")
         sys.stdout.flush()
 
@@ -571,6 +580,7 @@ def main():
             tokenizer=tokenizer,
             subject_to_int=subject_to_int,
             int_to_subject=int_to_subject,
+            compute_macro=args.compute_macro_accuracy,
         )
         print_memory_consumed(rank=RANK)
         logger.info(
@@ -691,10 +701,11 @@ def main():
                         tokenizer=tokenizer,
                         subject_to_int=subject_to_int,
                         int_to_subject=int_to_subject,
+                        compute_macro=args.compute_macro_accuracy,
                     )
                     print_memory_consumed(rank=RANK)
                     logger.info(
-                        f"iter {completed_steps}. mmlu val accuracy: macro {acc['macro']:.4f}, micro {acc['micro']:.4f}"
+                        f"iter {completed_steps}. mmlu val accuracy: micro {acc['micro']:.4f}"
                     )
                     save_statistics(
                         train_stats,
@@ -733,9 +744,10 @@ def main():
             tokenizer=tokenizer,
             subject_to_int=subject_to_int,
             int_to_subject=int_to_subject,
+            compute_macro=args.compute_macro_accuracy,
         )
         logger.info(
-            f"iter {completed_steps}. mmlu test accuracy: macro {acc['macro']:.4f}, micro {acc['micro']:.4f}"
+            f"iter {completed_steps}. mmlu test accuracy: micro {acc['micro']:.4f}"
         )
         save_statistics(
             train_stats,
@@ -752,14 +764,21 @@ def main():
 # FSDP has issues with `inference_mode`
 # @torch.inference_mode()
 @torch.no_grad()
-def evaluate(model, dataloader, tokenizer, subject_to_int, int_to_subject):
+def evaluate(
+    model,
+    dataloader,
+    tokenizer,
+    compute_macro=None,
+    subject_to_int=None,
+    int_to_subject=None,
+):
     model.eval()
 
     predictions, ground_truths, subjects = [], [], []
     for iter_num, batch in enumerate(dataloader):
 
         if (iter_num + 1) % int(
-            100 / (dataloader.batch_size * WORLD_SIZE)
+            1000 / (dataloader.batch_size * WORLD_SIZE)
         ) == 0 and RANK == 0:
             print(
                 f"{iter_num * dataloader.batch_size*WORLD_SIZE+1}/ {len(dataloader.dataset)} inputs processed"
@@ -776,35 +795,45 @@ def evaluate(model, dataloader, tokenizer, subject_to_int, int_to_subject):
         seq_len = torch.sum(mask, dim=1)
 
         last_logits = logits[torch.arange(logits.shape[0]), seq_len - 1]
-        predictions.extend(torch.argmax(last_logits, dim=-1, keepdims=True))
-        ground_truths.extend(targets)
-        subjects.extend(
-            [
-                torch.tensor([subject_to_int[subj]]).to("cuda")
-                for subj in batch["subjects"]
-            ]
-        )
+
+        predictions += [torch.argmax(last_logits, dim=-1, keepdims=True)]
+        ground_truths += [targets]
+        if compute_macro:
+            subjects.extend(
+                [
+                    torch.tensor([subject_to_int[subj]]).to("cuda")
+                    for subj in batch["subjects"]
+                ]
+            )
 
     predictions = torch.cat(predictions)
     ground_truths = torch.cat(ground_truths)
-    subjects = torch.cat(subjects)
+
+    if compute_macro:
+        subjects = torch.cat(subjects)
 
     if WORLD_SIZE > 1:
         pred_list = [torch.zeros_like(predictions) for _ in range(WORLD_SIZE)]
         gt_list = [torch.zeros_like(ground_truths) for _ in range(WORLD_SIZE)]
-        subject_list = [torch.zeros_like(subjects) for _ in range(WORLD_SIZE)]
 
         dist.all_gather(pred_list, predictions)
         dist.all_gather(gt_list, ground_truths)
-        dist.all_gather(subject_list, subjects)
 
         predictions = torch.cat(pred_list, dim=0).cpu()
         ground_truths = torch.cat(gt_list, dim=0).cpu()
-        subjects = torch.cat(subject_list, dim=0)
+
+        if compute_macro:
+            subject_list = [torch.zeros_like(subjects) for _ in range(WORLD_SIZE)]
+            dist.all_gather(subject_list, subjects)
+            subjects = torch.cat(subject_list, dim=0)
 
     ground_truths = np.array([tokenizer.decode(tg).strip() for tg in ground_truths])
     predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
-    subjects = subjects.cpu().numpy()
+
+    if compute_macro:
+        subjects = subjects.cpu().numpy()
+    else:
+        subjects = None
     acc_pred = compute_accuracy(predictions, ground_truths, subjects, int_to_subject)
 
     return acc_pred
