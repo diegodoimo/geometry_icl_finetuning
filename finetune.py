@@ -777,9 +777,8 @@ def evaluate(
 
     for iter_num, batch in enumerate(dataloader):
         post_proc += time.time() - start
-        
-        start = time.time()
 
+        start = time.time()
         if (iter_num + 1) % int(
             1000 / (dataloader.batch_size * WORLD_SIZE)
         ) == 0 and RANK == 0:
@@ -789,23 +788,27 @@ def evaluate(
             sys.stdout.flush()
 
         input_ids, targets, mask = (
-            batch["input_ids"].to("cuda"),
-            batch["labels"].to("cuda"),
-            batch["attention_mask"].to("cuda"),
+            batch["input_ids"],
+            batch["labels"],
+            batch["attention_mask"],
         )
+        input_ids = input_ids.to("cuda")
         outputs = model(input_ids)
         logits = outputs.logits
 
         fw_time = time.time() - start
         start = time.time()
 
-
         seq_len = torch.sum(mask, dim=1)
-
         last_logits = logits[torch.arange(logits.shape[0]), seq_len - 1]
 
-        predictions += [torch.argmax(last_logits, dim=-1, keepdims=True)]
-        ground_truths += [targets]
+        # predictions += [torch.argmax(last_logits, dim=-1, keepdims=True)]
+        # ground_truths += [targets]
+
+        batch_prediction_indices = torch.argmax(last_logits, dim=-1)
+        predictions += batch_prediction_indices.tolist()
+        ground_truths += tokenizer.batch_decode(targets, skip_special_tokens=True)
+
         if compute_macro:
             subjects.extend(
                 [
@@ -815,11 +818,13 @@ def evaluate(
             )
 
     post_proc += time.time() - start
-    
     start = time.time()
 
-    predictions = torch.cat(predictions)
-    ground_truths = torch.cat(ground_truths)
+    predictions = torch.tensor(predictions)
+    predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
+
+    # predictions = torch.cat(predictions)
+    # ground_truths = torch.cat(ground_truths)
 
     if compute_macro:
         subjects = torch.cat(subjects)
@@ -839,8 +844,10 @@ def evaluate(
             dist.all_gather(subject_list, subjects)
             subjects = torch.cat(subject_list, dim=0)
 
-    ground_truths = np.array([tokenizer.decode(tg).strip() for tg in ground_truths])
-    predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
+    # ground_truths = np.array([tokenizer.decode(tg).strip() for tg in ground_truths])
+    # predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
+
+    ground_truths = np.array([tg.strip() for tg in ground_truths])
 
     if compute_macro:
         subjects = subjects.cpu().numpy()
@@ -850,7 +857,7 @@ def evaluate(
 
     print("post proc2: ", time.time() - start)
     print("post proc: ", post_proc)
-    print("fw: ", fw_time) 
+    print("fw: ", fw_time)
 
     return acc_pred
 
