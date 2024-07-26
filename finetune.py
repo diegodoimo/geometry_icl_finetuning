@@ -250,7 +250,7 @@ def parse_args():
     parser.add_argument("--save_checkpoint", action="store_true")
     parser.add_argument("--eval_only", action="store_true")
     parser.add_argument("--weight_samples", action="store_true")
-    parser.add_argument("--macro_accuracy", action="store_true")
+    parser.add_argument("--compute_macro_accuracy", action="store_true")
     args = parser.parse_args()
 
     return args
