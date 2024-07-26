@@ -756,10 +756,17 @@ def evaluate(model, dataloader, tokenizer, subject_to_int, int_to_subject):
     model.eval()
 
     predictions, ground_truths, subjects = [], [], []
+    fw_time = 0
+    post_proc = 0
+    start = time.time()
+
     for iter_num, batch in enumerate(dataloader):
+        post_proc += time.time() - start
+        
+        start = time.time()
 
         if (iter_num + 1) % int(
-            100 / (dataloader.batch_size * WORLD_SIZE)
+            1000 / (dataloader.batch_size * WORLD_SIZE)
         ) == 0 and RANK == 0:
             print(
                 f"{iter_num * dataloader.batch_size*WORLD_SIZE+1}/ {len(dataloader.dataset)} inputs processed"
@@ -773,6 +780,11 @@ def evaluate(model, dataloader, tokenizer, subject_to_int, int_to_subject):
         )
         outputs = model(input_ids)
         logits = outputs.logits
+
+        fw_time = time.time() - start
+        start = time.time()
+
+
         seq_len = torch.sum(mask, dim=1)
 
         last_logits = logits[torch.arange(logits.shape[0]), seq_len - 1]
@@ -784,6 +796,10 @@ def evaluate(model, dataloader, tokenizer, subject_to_int, int_to_subject):
                 for subj in batch["subjects"]
             ]
         )
+
+    post_proc += time.time() - start
+    
+    start = time.time()
 
     predictions = torch.cat(predictions)
     ground_truths = torch.cat(ground_truths)
@@ -806,6 +822,10 @@ def evaluate(model, dataloader, tokenizer, subject_to_int, int_to_subject):
     predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
     subjects = subjects.cpu().numpy()
     acc_pred = compute_accuracy(predictions, ground_truths, subjects, int_to_subject)
+
+    print("post proc2: ", time.time() - start)
+    print("post proc: ", post_proc)
+    print("fw: ", fw_time) 
 
     return acc_pred
 
