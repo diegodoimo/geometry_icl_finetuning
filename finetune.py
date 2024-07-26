@@ -567,10 +567,6 @@ def main():
 
     train_stats = defaultdict(dict)
     if args.measure_baselines:
-        output_dir = ""
-        if args.output_dir is not None:
-            output_dir = os.path.join(args.output_dir, output_dir)
-
         accelerator.print("measuring baselines..")
         sys.stdout.flush()
 
@@ -591,7 +587,7 @@ def main():
             stats=stats,
             completed_steps=0,
             epoch=0,
-            results_dir=output_dir,
+            results_dir=args.output_dir,
             filename=filename,
             acc_val=acc,
         )
