@@ -813,13 +813,12 @@ def evaluate(
             # predictions += batch_prediction_indices.tolist()
             # ground_truths += tokenizer.batch_decode(targets, skip_special_tokens=True)
 
-            if compute_macro:
-                subjects.extend(
-                    [
-                        torch.tensor([subject_to_int[subj]]).to("cuda")
-                        for subj in batch["subjects"]
-                    ]
-                )
+            subjects.extend(
+                [
+                    torch.tensor([subject_to_int[subj]]).to("cuda")
+                    for subj in batch["subjects"]
+                ]
+            )
 
             post2 += time.time() - start
             start = time.time()
@@ -832,8 +831,7 @@ def evaluate(
 
     predictions = torch.cat(predictions)
     ground_truths = torch.cat(ground_truths)
-    if compute_macro:
-        subjects = torch.cat(subjects)
+    subjects = torch.cat(subjects)
 
     if WORLD_SIZE > 1:
         pred_list = [torch.zeros_like(predictions) for _ in range(WORLD_SIZE)]
@@ -852,13 +850,10 @@ def evaluate(
 
     ground_truths = np.array([tokenizer.decode(tg).strip() for tg in ground_truths])
     predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
+    subjects = subjects.cpu().numpy()
 
     # ground_truths = np.array([tg.strip() for tg in ground_truths])
 
-    if compute_macro:
-        subjects = subjects.cpu().numpy()
-    else:
-        subjects = None
     acc_pred = compute_accuracy(predictions, ground_truths, subjects, int_to_subject)
 
     print("final operations: ", time.time() - start)
