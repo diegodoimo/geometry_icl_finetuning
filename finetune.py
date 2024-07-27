@@ -778,46 +778,52 @@ def evaluate(
     start = time.time()
 
     for iter_num, batch in enumerate(dataloader):
-        post_proc += time.time() - start
+        if iter_num < 100:
+            post_proc += time.time() - start
 
-        start = time.time()
-        if (iter_num + 1) % int(
-            1000 / (dataloader.batch_size * WORLD_SIZE)
-        ) == 0 and RANK == 0:
-            print(
-                f"{iter_num * dataloader.batch_size*WORLD_SIZE+1}/ {len(dataloader.dataset)} inputs processed"
+            start = time.time()
+            if (iter_num + 1) % int(
+                1000 / (dataloader.batch_size * WORLD_SIZE)
+            ) == 0 and RANK == 0:
+                print(
+                    f"{iter_num * dataloader.batch_size*WORLD_SIZE+1}/ {len(dataloader.dataset)} inputs processed"
+                )
+                sys.stdout.flush()
+
+            input_ids, targets, mask = (
+                batch["input_ids"],
+                batch["labels"],
+                batch["attention_mask"],
             )
-            sys.stdout.flush()
+            input_ids = input_ids.to("cuda")
+            outputs = model(input_ids)
+            logits = outputs.logits
 
-        input_ids, targets, mask = (
-            batch["input_ids"],
-            batch["labels"],
-            batch["attention_mask"],
-        )
-        input_ids = input_ids.to("cuda")
-        outputs = model(input_ids)
-        logits = outputs.logits
+            fw_time += time.time() - start
+            start = time.time()
 
-        fw_time = time.time() - start
+            seq_len = torch.sum(mask, dim=1)
+            last_logits = logits[torch.arange(logits.shape[0]), seq_len - 1]
+            # predictions += [torch.argmax(last_logits, dim=-1, keepdims=True)]
+            # ground_truths += [targets]
+            batch_prediction_indices = torch.argmax(last_logits, dim=-1)
 
-        start = time.time()
-        seq_len = torch.sum(mask, dim=1)
-        last_logits = logits[torch.arange(logits.shape[0]), seq_len - 1]
+            post1 += time.time() - start
+            start = time.time()
 
-        # predictions += [torch.argmax(last_logits, dim=-1, keepdims=True)]
-        # ground_truths += [targets]
-        batch_prediction_indices = torch.argmax(last_logits, dim=-1)
+            predictions += batch_prediction_indices.tolist()
+            ground_truths += tokenizer.batch_decode(targets, skip_special_tokens=True)
 
-        predictions += batch_prediction_indices.tolist()
-        ground_truths += tokenizer.batch_decode(targets, skip_special_tokens=True)
+            if compute_macro:
+                subjects.extend(
+                    [
+                        torch.tensor([subject_to_int[subj]]).to("cuda")
+                        for subj in batch["subjects"]
+                    ]
+                )
 
-        if compute_macro:
-            subjects.extend(
-                [
-                    torch.tensor([subject_to_int[subj]]).to("cuda")
-                    for subj in batch["subjects"]
-                ]
-            )
+            post2 += time.time() - start
+            start = time.time()
 
     post_proc += time.time() - start
     start = time.time()
@@ -858,6 +864,8 @@ def evaluate(
 
     print("post proc2: ", time.time() - start)
     print("post proc: ", post_proc)
+    print("post1: ", post1)
+    print("post2: ", post2)
     print("fw: ", fw_time)
 
     return acc_pred
