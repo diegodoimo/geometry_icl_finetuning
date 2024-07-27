@@ -267,36 +267,35 @@ def main():
         args=args, world_size=WORLD_SIZE
     )
 
-    # # # we use fsdp also when world size ==1. accelerate issue in casting
-    # if WORLD_SIZE > 1:
-
-    os.environ["ACCELERATE_USE_FSDP"] = "true"
     os.environ["ACCELERATE_MIXED_PRECISION"] = "bf16"
+    fsdp_plugin = None
+    if WORLD_SIZE > 1:
+        os.environ["ACCELERATE_USE_FSDP"] = "true"
 
-    def lambda_fn(module: torch.nn.Module):
-        if isinstance(module, LlamaDecoderLayer):
-            return True  # like transformer_auto_wrap_policy
-        if isinstance(module, torch.nn.Linear) and all(
-            p.requires_grad for p in module.parameters()
-        ):
-            return True  # wrap each trainable linear separately
-        return False
+        def lambda_fn(module: torch.nn.Module):
+            if isinstance(module, LlamaDecoderLayer):
+                return True  # like transformer_auto_wrap_policy
+            if isinstance(module, torch.nn.Linear) and all(
+                p.requires_grad for p in module.parameters()
+            ):
+                return True  # wrap each trainable linear separately
+            return False
 
-    auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
+        auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
 
-    fsdp_plugin = FullyShardedDataParallelPlugin(
-        sharding_strategy=ShardingStrategy.FULL_SHARD,
-        backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
-        auto_wrap_policy=auto_wrap_policy,
-        cpu_offload=False,
-        ignored_modules=None,
-        limit_all_gathers=True,
-        use_orig_params=True,
-        param_init_fn=None,
-        sync_module_states=True,
-        forward_prefetch=False,
-        activation_checkpointing=False,
-    )
+        fsdp_plugin = FullyShardedDataParallelPlugin(
+            sharding_strategy=ShardingStrategy.FULL_SHARD,
+            backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
+            auto_wrap_policy=auto_wrap_policy,
+            cpu_offload=False,
+            ignored_modules=None,
+            limit_all_gathers=True,
+            use_orig_params=True,
+            param_init_fn=None,
+            sync_module_states=True,
+            forward_prefetch=False,
+            activation_checkpointing=False,
+        )
 
     accelerator = Accelerator(
         gradient_accumulation_steps=gradient_accumulation_steps, fsdp_plugin=fsdp_plugin
