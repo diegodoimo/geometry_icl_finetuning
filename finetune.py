@@ -270,7 +270,7 @@ def main():
     # # # we use fsdp also when world size ==1. accelerate issue in casting
     # if WORLD_SIZE > 1:
 
-    os.environ["ACCELERATE_USE_FSDP"] = "true"
+    #os.environ["ACCELERATE_USE_FSDP"] = "true"
     os.environ["ACCELERATE_MIXED_PRECISION"] = "bf16"
 
     def lambda_fn(module: torch.nn.Module):
@@ -297,7 +297,8 @@ def main():
         forward_prefetch=False,
         activation_checkpointing=False,
     )
-
+    
+    fsdp_plugin=None
     accelerator = Accelerator(
         gradient_accumulation_steps=gradient_accumulation_steps, fsdp_plugin=fsdp_plugin
     )
