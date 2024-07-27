@@ -803,15 +803,15 @@ def evaluate(
 
             seq_len = torch.sum(mask, dim=1)
             last_logits = logits[torch.arange(logits.shape[0]), seq_len - 1]
-            # predictions += [torch.argmax(last_logits, dim=-1, keepdims=True)]
-            # ground_truths += [targets]
-            batch_prediction_indices = torch.argmax(last_logits, dim=-1)
+            predictions += [torch.argmax(last_logits, dim=-1, keepdims=True)]
+            ground_truths += [targets]
+            # batch_prediction_indices = torch.argmax(last_logits, dim=-1)
 
             post1 += time.time() - start
             start = time.time()
 
-            predictions += batch_prediction_indices.tolist()
-            ground_truths += tokenizer.batch_decode(targets, skip_special_tokens=True)
+            # predictions += batch_prediction_indices.tolist()
+            # ground_truths += tokenizer.batch_decode(targets, skip_special_tokens=True)
 
             if compute_macro:
                 subjects.extend(
@@ -827,11 +827,11 @@ def evaluate(
     post_proc += time.time() - start
     start = time.time()
 
-    predictions = torch.tensor(predictions)
-    predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
+    # predictions = torch.tensor(predictions)
+    # predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
 
-    # predictions = torch.cat(predictions)
-    # ground_truths = torch.cat(ground_truths)
+    predictions = torch.cat(predictions)
+    ground_truths = torch.cat(ground_truths)
     if compute_macro:
         subjects = torch.cat(subjects)
 
@@ -850,10 +850,10 @@ def evaluate(
             dist.all_gather(subject_list, subjects)
             subjects = torch.cat(subject_list, dim=0)
 
-    # ground_truths = np.array([tokenizer.decode(tg).strip() for tg in ground_truths])
-    # predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
+    ground_truths = np.array([tokenizer.decode(tg).strip() for tg in ground_truths])
+    predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
 
-    ground_truths = np.array([tg.strip() for tg in ground_truths])
+    # ground_truths = np.array([tg.strip() for tg in ground_truths])
 
     if compute_macro:
         subjects = subjects.cpu().numpy()
