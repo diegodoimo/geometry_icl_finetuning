@@ -789,9 +789,6 @@ def evaluate(
         outputs = model(input_ids)
         logits = outputs.logits
 
-        fw_time += time.time() - start
-        start = time.time()
-
         seq_len = torch.sum(mask, dim=1)
         last_logits = logits[torch.arange(logits.shape[0]), seq_len - 1]
         predictions += [torch.argmax(last_logits, dim=-1, keepdims=True)]
@@ -825,8 +822,6 @@ def evaluate(
     ground_truths = np.array([tokenizer.decode(tg).strip() for tg in ground_truths])
     predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
     subjects = subjects.cpu().numpy()
-
-    # ground_truths = np.array([tg.strip() for tg in ground_truths])
 
     acc_pred = compute_accuracy(predictions, ground_truths, subjects, int_to_subject)
 
