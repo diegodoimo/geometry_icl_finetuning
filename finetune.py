@@ -591,7 +591,7 @@ def main():
             filename=filename,
             acc_val=acc,
         )
-
+    assert False
     accelerator.print("start training")
     accelerator.print("memory before train run")
     sys.stdout.flush()
@@ -773,6 +773,8 @@ def evaluate(
     predictions, ground_truths, subjects = [], [], []
     fw_time = 0
     post_proc = 0
+    post1 = 0
+    post2 = 0
     start = time.time()
 
     for iter_num, batch in enumerate(dataloader):
@@ -804,8 +806,8 @@ def evaluate(
 
         # predictions += [torch.argmax(last_logits, dim=-1, keepdims=True)]
         # ground_truths += [targets]
-
         batch_prediction_indices = torch.argmax(last_logits, dim=-1)
+
         predictions += batch_prediction_indices.tolist()
         ground_truths += tokenizer.batch_decode(targets, skip_special_tokens=True)
 
