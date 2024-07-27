@@ -797,8 +797,8 @@ def evaluate(
         logits = outputs.logits
 
         fw_time = time.time() - start
-        start = time.time()
 
+        start = time.time()
         seq_len = torch.sum(mask, dim=1)
         last_logits = logits[torch.arange(logits.shape[0]), seq_len - 1]
 
@@ -825,7 +825,6 @@ def evaluate(
 
     # predictions = torch.cat(predictions)
     # ground_truths = torch.cat(ground_truths)
-
     if compute_macro:
         subjects = torch.cat(subjects)
 
