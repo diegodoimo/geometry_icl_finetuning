@@ -796,7 +796,7 @@ def evaluate(
         outputs = model(input_ids)
         logits = outputs.logits
 
-        fw_time = time.time() - start
+        fw_time += time.time() - start
 
         start = time.time()
         seq_len = torch.sum(mask, dim=1)
