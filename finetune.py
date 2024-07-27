@@ -862,7 +862,7 @@ def evaluate(
         subjects = None
     acc_pred = compute_accuracy(predictions, ground_truths, subjects, int_to_subject)
 
-    print("post proc2: ", time.time() - start)
+    print("final operations: ", time.time() - start)
     print("post proc: ", post_proc)
     print("post1: ", post1)
     print("post2: ", post2)
