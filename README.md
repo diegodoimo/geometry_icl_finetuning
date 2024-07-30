@@ -6,8 +6,6 @@ This repository contains the source code for the paper: "The Representation Land
 - [Introduction](#introduction)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Contributing](#contributing)
-- [License](#license)
 
 ## Introduction
 
@@ -21,16 +19,21 @@ To set up the project, you will need to install [Poetry](https://python-poetry.o
    ```sh
    curl -sSL https://install.python-poetry.org | python3 -
 2. **Clone the repository**
-    git clone https://github.com/yourusername/your-repo-name.git
-    cd your-repo-name
-3. **Install the dependencies and create the virtual environment**:
-    poetry install
-4. **Activate the virtual environment**:
-    poetry shell
+   ```sh
+   git clone https://github.com/yourusername/your-repo-name.git
+   cd your-repo-name
+4. **Install the dependencies and create the virtual environment**:
+   ```sh
+   poetry install
+6. **Activate the virtual environment**:
+   ```sh
+   poetry shell
 
 ## Usage
 
 1. **Run a script**:
+   ```sh
     poetry run python your_script.py
-2. **Open a Jupyter notebook**
+3. **Open a Jupyter notebook**
+   ```sh
     poetry run jupyter notebook
