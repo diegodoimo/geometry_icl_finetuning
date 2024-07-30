@@ -28,7 +28,11 @@ class TestClustering(unittest.TestCase):
                      "/repo/results/evaluated_test/random_order/llama-3-8b")
 
         clustering = LabelClustering(path=_PATH / '2shot', parallel=False)
-        out = clustering.main(label="subjects", z=1.6, instance_per_sub=-1)
+        # out = clustering.main(label="subjects", z=1.6, instance_per_sub=-1,
+        #                       full_tensor=True)
+        # self.assertTrue(isinstance(out, dict))
+        out = clustering.main(label="subjects", z=1.6, instance_per_sub=-1,
+                              full_tensor=True)
         self.assertTrue(isinstance(out, dict))
 
 if __name__ == '__main__':

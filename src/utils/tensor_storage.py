@@ -9,8 +9,8 @@ import os
 from pathlib import Path
 import re
 import pickle
-from jaxtyping import Float, Int
-from typing import Tuple, Optional, LiteralString, List
+from jaxtyping import Float, Int, Bool
+from typing import Tuple, Optional, LiteralString, List, Union, Dict
 
 
 def merge_torch_tensors(
@@ -28,14 +28,15 @@ def merge_torch_tensors(
 
     # Load tensors and add them to a list
     tensors = [
-        torch.load(os.path.join(storage_path, file))
+        torch.load(os.path.join(storage_path, file),
+                   weights_only=True)
         for file in filtered_files
     ]
 
     # Stack all tensors along a new dimension
     stacked_tensor = torch.stack(tensors[:-1])
     logits = tensors[-1]
-    return stacked_tensor.float().cpu(), logits.float().cpu()
+    return stacked_tensor.float().cpu().numpy()[1:], logits.float().cpu().numpy()[1:]
 
 
 def merge_tensors(
@@ -68,9 +69,12 @@ def merge_tensors(
 def retrieve_from_storage(
         storage_path: Path,
         instances_per_sub: Optional[int] = -1,
-        ) -> Tuple[Float[Array, "num_instances num_layers d_model"],
-                   Float[Array, "num_instances d_vocab"],
-                   pd.DataFrame]:
+        full_tensor: Bool = False,
+        ) -> Union[Float[Array, "num_instances num_layers d_model"],
+                   Dict[str, Int[Array, "num_layers num_instances"]]] | \
+                    Union[Tuple[Float[Array, "num_instances num_layers nearest_neigh"], 
+                                Float[Array, "num_instances num_layers d_vocab"]], 
+                                Dict[str, Int[Array, "num_layers num_instances"]]]:
     """
     Retrieve tensors from a given path.
 
@@ -85,9 +89,9 @@ def retrieve_from_storage(
         number of instances.
     Returns
     -------
-    tuple of (np.ndarray, np.ndarray, pd.DataFrame)
-        Returns a tuple containing arrays of hidden states, logits, and 
-        the original DataFrame.
+    tuple (np.ndarray, np.ndarray, )
+          Returns a tuple containing arrays of hidden states, logits, and 
+          .
     """
     storage_path = Path(storage_path)
     # if mask_path:
@@ -97,59 +101,53 @@ def retrieve_from_storage(
         raise DataRetrievalError(f"Storage path does not exist:"
                                 f"{storage_path}")
 
-    files = os.listdir(storage_path)
+    if instances_per_sub != -1:
+        raise NotImplementedError("This feature is not implemented yet.")
 
-    # hidden_states, logits = merge_torch_tensors(
-    #     storage_path, files
-    # )
-
-    mat_dist, md_logits = merge_tensors(
-        "dist", storage_path, files
-    )
-    mat_coord, mc_logits = merge_tensors(
-        "index", storage_path, files
-    )
-    mat_inverse, mi_inverse = merge_tensors(
-        "inverse", storage_path, files
-    )
-    # return (hidden_states, logits), (mat_dist, md_logits), (mat_coord, mc_logits), (mat_inverse, mi_inverse)
-    # def rearrange_tensor(tensor, inverse):
-    #     new_tensor = np.empty((32, 14042, 51))
-    #     for layer in range(mat_dist.shape[0]):
-    #         new_tensor[layer] = tensor[layer][inverse[layer]]
-    #     return new_tensor
-    
-    def compute_pull_back(mat_inverse):
-        pull_back = []
-        for row in mat_inverse:
-            _, indices = np.unique(row, return_index=True)
-            pull_back.append(indices)
-        return pull_back
-    
-    pull_back = compute_pull_back(mat_inverse)
-    
-    # retrieve statistics
     with open(Path(storage_path, "statistics_target.pkl"), "rb") as f:
         stat_target = pickle.load(f)
 
     labels = {"subjects": stat_target["subjects"],
-              "predictions": stat_target["contrained_predictions"]}
-    labels["subjects"] = preprocess_label(labels["subjects"], pull_back)
-    labels["predictions"] = preprocess_label(labels["predictions"], pull_back)
+            "predictions": stat_target["contrained_predictions"]}
     
-    
-    if instances_per_sub != -1:
-        raise NotImplementedError("This feature is not implemented yet.")
-        # mask = sample_indices(labels["subjects"][0], instances_per_sub)
-        # mat_dist = mat_dist[:, mask]
-        # md_logits = md_logits[mask]
-        # mat_coord = mat_coord[:, mask]
-        # mc_logits = mc_logits[mask]
-        # labels["subjects"] = labels["subjects"][:, mask]
-        # labels["predictions"] = labels["predictions"][:, mask]   
-
-    return mat_dist, md_logits, mat_coord, mc_logits, labels
-            
+    files = os.listdir(storage_path)
+    if full_tensor:
+        hidden_states, logits = merge_torch_tensors(
+            storage_path, files
+        )
+        num_layers = hidden_states.shape[0]
+        labels["subjects"] = preprocess_label(labels["subjects"],
+                                              num_layers=num_layers)
+        labels["predictions"] = preprocess_label(labels["predictions"],
+                                                 num_layers=num_layers)
+        return hidden_states, labels, num_layers
+    else:
+        mat_dist, md_logits = merge_tensors(
+            "dist", storage_path, files
+        )
+        mat_coord, mc_logits = merge_tensors(
+            "index", storage_path, files
+        )
+        mat_inverse, mi_inverse = merge_tensors(
+            "inverse", storage_path, files
+        )
+        def compute_pull_back(mat_inverse):
+            pull_back = []
+            for row in mat_inverse:
+                _, indices = np.unique(row, return_index=True)
+                pull_back.append(indices)
+            return pull_back
+   
+        pull_back = compute_pull_back(mat_inverse)
+        num_layers = mat_dist.shape[0]
+        labels["subjects"] = preprocess_label(labels["subjects"],
+                                              pull_back=pull_back,
+                                              num_layers=num_layers)
+        labels["predictions"] = preprocess_label(labels["predictions"],
+                                                 pull_back=pull_back,
+                                                 num_layers=num_layers)
+        return (mat_dist, md_logits, mat_coord, mc_logits), labels, num_layers
+       
 
 def map_label_to_int(my_list: List[str]
                      ) -> Int[Array, "num_layers num_instances"]:
@@ -162,12 +160,15 @@ def map_label_to_int(my_list: List[str]
 
 
 def preprocess_label(label_array: Int[Array, "num_instances"],
-                     pull_back: Int[Array, "num_layers num_instances"]
+                     num_layers: Int,
+                     pull_back: Optional[
+                         Int[Array, "num_layers num_instances"]] = None,
                      ) -> Int[Array, "num_layers num_instances"]:
     label_array = map_label_to_int(label_array)
-    label_array = np.repeat(label_array[np.newaxis, :], 32, axis=0)
+    label_array = np.repeat(label_array[np.newaxis, :], num_layers, axis=0)
     row_indices = np.arange(label_array.shape[0])[:, None]
-    label_array = label_array[row_indices, pull_back]
+    if pull_back is not None:
+        label_array = label_array[row_indices, pull_back]
     return label_array
 
 
