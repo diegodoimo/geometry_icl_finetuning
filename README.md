@@ -20,8 +20,8 @@ To set up the project, you will need to install [Poetry](https://python-poetry.o
    curl -sSL https://install.python-poetry.org | python3 -
 2. **Clone the repository**
    ```sh
-   git clone https://github.com/yourusername/your-repo-name.git
-   cd your-repo-name
+   git clone git@github.com:diegodoimo/representation_landscape_fs_ft.git
+   cd representation_landscape_fs_ft
 4. **Install the dependencies and create the virtual environment**:
    ```sh
    poetry install
