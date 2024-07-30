@@ -1,5 +1,6 @@
 from src.utils.annotations import Array
 from src.utils.error import MetricComputationError, DataRetrievalError
+from src.utils.tensor_storage import retrieve_from_storage
 
 from dadapy.data import Data
 
@@ -31,9 +32,9 @@ class IntrinsicDimension():
         module_logger = logging.getLogger(__name__)
         module_logger.info("Computing ID")
 
-        tsm = self.tensor_storage
         try:
-            tensor_tuple = tsm.retrieve_tensor(self.path)
+            
+            tensor_tuple = retrieve_from_storage(self.path)
             mat_dist, _, mat_coord, _, _ = tensor_tuple
             id_per_layer_gride = (
                 self.parallel_compute(mat_dist, mat_coord)
@@ -121,9 +122,8 @@ class IntrinsicDimension():
         Returns
         """
         try:
-            data = Data(coordinates=mat_coord,
-                        distances=mat_dist)
-            data.remove_identical_points()
+            data = Data(distances=(mat_dist, mat_coord))
+            #data.remove_identical_points()
             out = data.return_id_scaling_gride(range_max=1000)[0]
         except Exception as e:
             raise MetricComputationError(f"Error raised by Dadapy: {e}")

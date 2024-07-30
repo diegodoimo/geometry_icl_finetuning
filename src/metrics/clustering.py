@@ -1,5 +1,6 @@
 from src.utils.annotations import Array
 from src.utils.error import MetricComputationError, DataRetrievalError
+from src.utils.tensor_storage import retrieve_from_storage
 import logging
 from dadapy.data import Data
 from sklearn.metrics import mutual_info_score
@@ -9,6 +10,7 @@ from sklearn.metrics.cluster import adjusted_rand_score, \
                                     homogeneity_score
 
 from sklearn.metrics import f1_score
+from scipy.stats import entropy
 
 import tqdm
 import pandas as pd
@@ -18,7 +20,7 @@ from functools import partial
 import logging
 from pathlib import Path
 from jaxtyping import Float, Int, Bool
-from typing import Dict, LiteralString
+from typing import Dict, LiteralString, List
 
 
 f1_score_micro = partial(f1_score, average="micro")
@@ -43,7 +45,8 @@ class LabelClustering():
     def main(self,
              z: Float,
              label: LiteralString,
-             halo: Bool = False, ) -> pd.DataFrame:
+             halo: Bool = False, 
+             instance_per_sub: int = -1) -> pd.DataFrame:
         """
         Compute the overlap between the layers of instances in which the model
         answered with the same letter
@@ -55,13 +58,10 @@ class LabelClustering():
         module_logger.info(f"Computing label cluster with label {label}")
 
         self.label = label
-        tsm = self.tensor_storage
         
-        tensor_tuple = tsm.retrieve_tensor(self.path)
-        mat_dist, _, mat_coord, _, hidden_states_df = tensor_tuple
-        label_per_row = self.constructing_labels(
-            hidden_states_df, mat_dist
-        )
+        tensor_tuple = retrieve_from_storage(self.path, instance_per_sub)
+        mat_dist, _, mat_coord, _, labels = tensor_tuple
+        label_per_row = labels[self.label]
         try:
             output_dict = self.parallel_compute(
                 mat_dist, mat_coord, label_per_row, z, halo
@@ -84,38 +84,12 @@ class LabelClustering():
 
         return output_dict
 
-    def constructing_labels(
-        self, 
-        hidden_states_df: pd.DataFrame, 
-        mat_dist: Float[Array, "num_layers num_instances nearest_neigh"],
-    ) -> Float[Array, "num_instances"]:
-        """
-        Map the labels to integers and return the labels for each instance 
-        in the hidden states.
-        Inputs:
-            hidden_states_df: pd.DataFrame
-            hidden_states: Float[Array, "num_instances, num_layers, model_dim"]
-        Returns:
-            Float[Int, "num_instances"]
-        """
-        labels_literals = hidden_states_df[self.label].unique()
-        labels_literals.sort()
-
-        map_labels = {class_name: n 
-                      for n, class_name in enumerate(labels_literals)}
-
-        label_per_row = hidden_states_df[self.label].reset_index(drop=True)
-        label_per_row = np.array(
-            [map_labels[class_name] for class_name in label_per_row]
-        )[: mat_dist.shape[1]]
-
-        return label_per_row
 
     def parallel_compute(
         self, 
         mat_dist: Float[Array, "num_layers num_instances nearest_neigh"],
         mat_coord: Float[Array, "num_layers num_instances nearest_neigh"],
-        label: Int[Array, "num_instances"],
+        label: Int[Array, "num_layers num_instances"],
         z: Float,
         halo: Bool = False,
     ) -> Dict[str, Float[Array, "num_layers"]]:
@@ -140,12 +114,12 @@ class LabelClustering():
             Dict[str, Float[Array, "num_layers"]]
         """
         assert (
-            mat_dist.shape[1] == label.shape[0]
-        ), "Label lenght don't mactch the number of instances"
+            mat_dist.shape[1] == label.shape[1]
+        ), "Label lenght don't match the number of instances"
         number_of_layers = mat_dist.shape[0]
         
         process_layer = partial(
-            self.process_layer, label=label, z=z, halo=halo
+            self.process_layer, z=z, halo=halo
         )
         results = []
         if self.parallel:
@@ -153,13 +127,17 @@ class LabelClustering():
             # If the program crash try reducing the number of jobs
             with Parallel(n_jobs=-1) as parallel:
                 results = parallel(
-                    delayed(process_layer)(mat_dist[layer], mat_coord[layer])
-                    for layer in tqdm.tqdm(range(1, number_of_layers),
+                    delayed(process_layer)(mat_dist[layer],
+                                           mat_coord[layer],
+                                           label=label[layer])
+                    for layer in tqdm.tqdm(range(number_of_layers),
                                            desc="Processing layers")
                 )
         else:
-            for layer in tqdm.tqdm(range(1, number_of_layers)):
-                results.append(process_layer(mat_dist[layer], mat_coord[layer]))
+            for layer in tqdm.tqdm(range(number_of_layers)):
+                results.append(process_layer(mat_dist[layer],
+                                             mat_coord[layer],
+                                             label=label[layer]))
         
         keys = list(results[0].keys())
         output = {key: [] for key in keys}
@@ -194,8 +172,8 @@ class LabelClustering():
         layer_results = {}
         try:
             # do clustering
-            data = Data(coordinates=mat_coord, distances=mat_dist)
-            ids, _, _ = data.return_id_scaling_gride(range_max=100)
+            data = Data(distances=(mat_dist, mat_coord))
+            ids, _, _ = data.return_id_scaling_gride(range_max=50)
             data.set_id(ids[3])
             data.compute_density_kNN(k=16)
 
@@ -212,4 +190,75 @@ class LabelClustering():
             raise MetricComputationError(f"Error raised by sklearn: {e}")
 
         layer_results["labels"] = label
+        layer_results["cluster_assignment"] = clusters_assignment 
         return layer_results
+    
+    def compute_additional_metrics(self, clustering_result: List[
+        Dict[str, Float[Array, "num_layers"]]]
+                                   ) -> pd.DataFrame:
+        """
+        Compute the following metrics for clustering:
+            - Number of clusters
+            - Number of assigned points
+            - Mean cluster size
+            - Variance cluster size
+            - Entropy of the distribution of assignments
+        Inputs:
+            
+        Returns:
+            pd.DataFrame
+        """
+        df = pd.DataFrame(clustering_result)
+        df_rows = []
+        for row in df.iterrows():
+            row = row[1]
+            cluster_assignment_all = row["cluster_assignment"]
+            n_layers = len(cluster_assignment_all)
+            num_clusters = np.zeros(n_layers)
+            num_assigned_points = np.zeros(n_layers)
+            mean_cluster_size = np.zeros(n_layers)
+            var_cluster_size = np.zeros(n_layers)
+            entropy_values = np.zeros(n_layers)
+            fraction_most_represented = np.zeros(n_layers)
+            subjects_all = np.array(row["labels"])
+            for i in range(n_layers):
+                assignments = cluster_assignment_all[i]
+                subjects = subjects_all[i]
+
+                # Calculate cluster metrics
+                valid_assignments = assignments[assignments != -1]
+                unique_clusters, counts = np.unique(valid_assignments, return_counts=True)
+
+                num_clusters[i] += len(unique_clusters)
+                num_assigned_points[i] += len(valid_assignments)/len(assignments)
+                mean_cluster_size[i] += np.mean(counts)
+                var_cluster_size[i] += np.var(counts)
+                # Entropy of the distribution of assignments
+                # Fraction of the most represented class
+                for cluster, count_cluster in zip(unique_clusters, counts):
+                    iter_subject = subjects[assignments == cluster]
+                    unique_sub, counts_sub = np.unique(iter_subject, return_counts=True)
+                    entropy_values[i] += entropy(counts_sub)*count_cluster
+                    if len(counts) > 0:
+                        fraction_most_represented[i] += (np.max(counts_sub) / np.sum(counts_sub))*count_cluster
+                    else:
+                        fraction_most_represented[i] += 0
+                    
+                entropy_values[i] = entropy_values[i] / unique_clusters.shape[0]
+                fraction_most_represented[i] =  fraction_most_represented[i] / unique_clusters.shape[0]
+                
+            df_rows.append([num_clusters, 
+                            num_assigned_points, 
+                            mean_cluster_size, 
+                            var_cluster_size, 
+                            entropy_values, 
+                            fraction_most_represented])
+
+        df_out = pd.DataFrame(df_rows, columns=["num_clusters", 
+                                                "num_assigned_points", 
+                                                "mean_cluster_size", 
+                                                "var_cluster_size", 
+                                                "entropy_values", 
+                                                "fraction_most_represented"])
+        return df_out
+        
