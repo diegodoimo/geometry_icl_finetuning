@@ -12,6 +12,7 @@ from joblib import Parallel, delayed
 from functools import partial
 import logging
 from jaxtyping import Float, Int, Bool
+from typing import Tuple
 
 
 class IntrinsicDimension():
@@ -22,7 +23,9 @@ class IntrinsicDimension():
         self.path = path
         self.parallel = parallel
 
-    def main(self) -> pd.DataFrame:
+    def main(self,
+             instance_per_sub: Int = -1,
+             full_tensor: Bool = False) -> pd.DataFrame:
         """
         Compute the intrinsic dimension of the hidden states of a model
         Returns
@@ -34,10 +37,13 @@ class IntrinsicDimension():
 
         try:
             
-            tensor_tuple = retrieve_from_storage(self.path)
-            mat_dist, _, mat_coord, _, _ = tensor_tuple
+            out_from_storage = retrieve_from_storage(self.path,
+                                                     instance_per_sub,
+                                                     full_tensor)
+            
+            tensors, _, number_of_layers = out_from_storage
             id_per_layer_gride = (
-                self.parallel_compute(mat_dist, mat_coord)
+                self.parallel_compute(number_of_layers, tensors)
             )
         except DataRetrievalError as e:
             module_logger.error(
@@ -59,8 +65,10 @@ class IntrinsicDimension():
 
     def parallel_compute(
             self, 
-            mat_dist: Float[Array, "num_layers num_instances nearest_neigh"],
-            mat_coord: Float[Array, "num_layers num_instances nearest_neigh"]
+            number_of_layers: Int,
+            tensors: Float[Array, "num_layers num_instances d_model"] | 
+            Tuple[Float[Array, "num_layers num_instances nearest_neigh"]],
+            
     ) -> Float[Array, "order_of_nearest_neighbour num_layers"]:
         """
         Collect hidden states of all instances and compute ID using gride
@@ -81,27 +89,23 @@ class IntrinsicDimension():
         """
 
         id_per_layer_gride = []
-
-        num_layers = mat_dist.shape[0]
-        
+        process_layer = partial(
+            self.process_layer, tensors=tensors
+        )
         if self.parallel:
             # Parallelize the computation of the metric
             # If the program crash try reducing the number of jobs
             with Parallel(n_jobs=-1) as parallel:
                 id_per_layer_gride = parallel(
-                    delayed(self.process_layer)(mat_dist=mat_dist[layer],
-                                                mat_coord=mat_coord[layer])
-                    for layer in tqdm.tqdm(range(1, num_layers),
+                    delayed(process_layer)(layer)
+                    for layer in tqdm.tqdm(range(1, number_of_layers),
                                            desc="Processing layers")
                 )
         else:
             # Sequential version
-            for layer in tqdm.tqdm(range(1, num_layers),
+            for layer in tqdm.tqdm(range(1, number_of_layers),
                                    desc="Processing layers"):
-                id_per_layer_gride.append(self.process_layer(
-                    mat_dist=mat_dist[layer],
-                    mat_coord=mat_coord[layer]
-                    ))
+                id_per_layer_gride.append(process_layer(layer))
         
         # Inserting ID 0 because Dadapy raise an error
         id_per_layer_gride.insert(0, np.ones(id_per_layer_gride[-1].shape[0]))
@@ -109,8 +113,9 @@ class IntrinsicDimension():
                
     def process_layer(
             self, 
-            mat_dist: Float[Array, "num_instances nearest_neigh"],
-            mat_coord: Float[Array, "num_instances nearest_neigh"]
+            layer: Int,
+            tensors: Float[Array, "num_layers num_instances d_model"] |
+            Tuple[Float[Array, "num_layers num_instances nearest_neigh"]],
     ) -> Float[Array, "order_of_nearest neighbour"]:
         """
         Process a single layer
@@ -122,8 +127,15 @@ class IntrinsicDimension():
         Returns
         """
         try:
-            data = Data(distances=(mat_dist, mat_coord))
-            #data.remove_identical_points()
+            if isinstance(tensors, tuple):
+                mat_dist, _, mat_coord, _ = tensors
+                data = Data(distances=(mat_dist[layer], mat_coord[layer]))
+            elif isinstance(tensors, np.ndarray):
+                tensors = tensors[layer]
+                # do clustering
+                data = Data(coordinates=tensors)
+            
+            # data.remove_identical_points()
             out = data.return_id_scaling_gride(range_max=1000)[0]
         except Exception as e:
             raise MetricComputationError(f"Error raised by Dadapy: {e}")

@@ -93,7 +93,6 @@ class LabelClustering():
         number_of_layers: Int,
         tensors: Float[Array, "num_layers num_instances d_model"] |
         Tuple[Float[Array, "num_layers num_instances nearest_neigh"]],
-        
         label: Int[Array, "num_layers num_instances"],
         z: Float,
         halo: Bool = False,
