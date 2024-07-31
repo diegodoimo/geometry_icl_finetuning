@@ -5,6 +5,7 @@ env_amd/
 slurm*
 !slurm_runner.py
 results/
+pics/
 
 *.pkl
 **/__pycache__/

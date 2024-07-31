@@ -36,39 +36,31 @@ _COMPARISON_METRICS = {
 
 
 class LabelClustering():
-    def __init__(self,
-                 path: Path,
-                 parallel: Bool = True):
-        self.path = path
-        self.parallel = parallel
-    
+    def __init__(self):
+        pass
     def main(self,
              z: Float,
-             label: LiteralString,
+             tensors: Float[Array, "num_layers num_instances d_model"] |
+                Tuple[Float[Array, "num_layers num_instances nearest_neigh"]],
+             labels: Int[Array, "num_layers num_instances"],
+             number_of_layers: Int,
              halo: Bool = False,
-             full_tensor: Bool = False, 
-             instance_per_sub: int = -1) -> pd.DataFrame:
+             parallel: Bool = True
+             ) -> Dict[str, Float[Array, "num_layers num_layers"]]:
         """
-        Compute the overlap between the layers of instances in which the model
-        answered with the same letter
+        Compute the agreement between the clustering of the hidden states
+        and a given set of label.
         Output
         ----------
         Dict[layer: List[Float(num_layers, num_layers)]]
         """
         module_logger = logging.getLogger(__name__)
-        module_logger.info(f"Computing label cluster with label {label}")
-
-        self.label = label
+        module_logger.info(f"Computing label cluster")
         
-        out_from_storage = retrieve_from_storage(self.path,
-                                                 instance_per_sub,
-                                                 full_tensor)
-        
-        tensors, labels, number_of_layers = out_from_storage
-        label_per_row = labels[self.label]
         try:
+            
             output_dict = self.parallel_compute(
-                number_of_layers, tensors, label_per_row, z, halo
+                number_of_layers, tensors, labels, z, halo, parallel
             )
         except DataRetrievalError as e:
             module_logger.error(
@@ -93,9 +85,10 @@ class LabelClustering():
         number_of_layers: Int,
         tensors: Float[Array, "num_layers num_instances d_model"] |
         Tuple[Float[Array, "num_layers num_instances nearest_neigh"]],
-        label: Int[Array, "num_layers num_instances"],
+        labels: Int[Array, "num_layers num_instances"],
         z: Float,
         halo: Bool = False,
+        parallel: Bool = True
     ) -> Dict[str, Float[Array, "num_layers"]]:
         """
         Compute the overlap between a set of representations and a given label
@@ -120,20 +113,20 @@ class LabelClustering():
             self.process_layer, tensors=tensors, z=z, halo=halo
         )
         results = []
-        if self.parallel:
+        if parallel:
             # Parallelize the computation of the metric
             # If the program crash try reducing the number of jobs
             with Parallel(n_jobs=-1) as parallel:
                 results = parallel(
                     delayed(process_layer)(layer,
-                                           label=label[layer])
+                                           label=labels[layer])
                     for layer in tqdm.tqdm(range(number_of_layers),
                                            desc="Processing layers")
                 )
         else:
             for layer in tqdm.tqdm(range(number_of_layers)):
                 results.append(process_layer(layer,
-                                             label=label[layer]))
+                                             label=labels[layer]))
         
         keys = list(results[0].keys())
         output = {key: [] for key in keys}

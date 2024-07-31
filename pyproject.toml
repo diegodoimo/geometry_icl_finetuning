@@ -21,6 +21,7 @@ seaborn = "^0.13.2"
 matplotlib = "^3.9.1"
 einops = "^0.8.0"
 jupyterlab = "^4.2.4"
+datasets = "^2.20.0"
 
 
 

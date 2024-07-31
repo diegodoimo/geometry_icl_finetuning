@@ -54,6 +54,9 @@ def merge_tensors(
     # Sort files based on the number in the filename
     filtered_files.sort(key=lambda x: int(pattern.match(x).group(1)))
 
+    # Check if the filea exist
+    if len(filtered_files) == 0:
+        return None
     # Load tensors and add them to a list
     tensors = [
         np.load(os.path.join(storage_path, file))
@@ -70,10 +73,11 @@ def retrieve_from_storage(
         storage_path: Path,
         instances_per_sub: Optional[int] = -1,
         full_tensor: Bool = False,
+        layers: Optional[List[int]] = None,
         ) -> Union[Float[Array, "num_instances num_layers d_model"],
                    Dict[str, Int[Array, "num_layers num_instances"]]] | \
                     Union[Tuple[Float[Array, "num_instances num_layers nearest_neigh"], 
-                                Float[Array, "num_instances num_layers d_vocab"]], 
+                                Float[Array, "num_instances num_layers d_vocab"]],
                                 Dict[str, Int[Array, "num_layers num_instances"]]]:
     """
     Retrieve tensors from a given path.
@@ -101,14 +105,13 @@ def retrieve_from_storage(
         raise DataRetrievalError(f"Storage path does not exist:"
                                 f"{storage_path}")
 
-    if instances_per_sub != -1:
-        raise NotImplementedError("This feature is not implemented yet.")
+
 
     with open(Path(storage_path, "statistics_target.pkl"), "rb") as f:
         stat_target = pickle.load(f)
 
     labels = {"subjects": stat_target["subjects"],
-            "predictions": stat_target["contrained_predictions"]}
+              "predictions": stat_target["contrained_predictions"]}
     
     files = os.listdir(storage_path)
     if full_tensor:
@@ -120,6 +123,11 @@ def retrieve_from_storage(
                                               num_layers=num_layers)
         labels["predictions"] = preprocess_label(labels["predictions"],
                                                  num_layers=num_layers)
+        if instances_per_sub != -1:
+            indices = sample_indices(labels["subjects"][0], instances_per_sub)
+            hidden_states = hidden_states[:, indices]
+            labels["subjects"] = labels["subjects"][:, indices]
+            labels["predictions"] = labels["predictions"][:, indices]
         return hidden_states, labels, num_layers
     else:
         mat_dist, md_logits = merge_tensors(
@@ -128,25 +136,40 @@ def retrieve_from_storage(
         mat_coord, mc_logits = merge_tensors(
             "index", storage_path, files
         )
-        mat_inverse, mi_inverse = merge_tensors(
+        
+        inverse_out = merge_tensors(
             "inverse", storage_path, files
         )
-        def compute_pull_back(mat_inverse):
-            pull_back = []
-            for row in mat_inverse:
-                _, indices = np.unique(row, return_index=True)
-                pull_back.append(indices)
-            return pull_back
-   
-        pull_back = compute_pull_back(mat_inverse)
-        num_layers = mat_dist.shape[0]
-        labels["subjects"] = preprocess_label(labels["subjects"],
-                                              pull_back=pull_back,
-                                              num_layers=num_layers)
-        labels["predictions"] = preprocess_label(labels["predictions"],
-                                                 pull_back=pull_back,
-                                                 num_layers=num_layers)
-        return (mat_dist, md_logits, mat_coord, mc_logits), labels, num_layers
+        if not inverse_out:
+            num_layers = mat_dist.shape[0]
+            labels["subjects"] = preprocess_label(labels["subjects"],
+                                                  num_layers=num_layers)
+            labels["predictions"] = preprocess_label(labels["predictions"],
+                                                     num_layers=num_layers)
+            return (mat_dist, md_logits, mat_coord, mc_logits), \
+                labels, \
+                num_layers
+        else:
+            mat_inverse, mi_inverse = inverse_out    
+        
+            def compute_pull_back(mat_inverse):
+                pull_back = []
+                for row in mat_inverse:
+                    _, indices = np.unique(row, return_index=True)
+                    pull_back.append(indices)
+                return pull_back
+    
+            pull_back = compute_pull_back(mat_inverse)
+            num_layers = mat_dist.shape[0]
+            labels["subjects"] = preprocess_label(labels["subjects"],
+                                                  pull_back=pull_back,
+                                                  num_layers=num_layers)
+            labels["predictions"] = preprocess_label(labels["predictions"],
+                                                     pull_back=pull_back,
+                                                     num_layers=num_layers)
+            return (mat_dist, md_logits, mat_coord, mc_logits), \
+                labels, \
+                num_layers
        
 
 def map_label_to_int(my_list: List[str]
