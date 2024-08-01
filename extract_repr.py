@@ -332,7 +332,7 @@ def main():
     accelerator.print("testing longest seq fints into memory..")
     sys.stdout.flush()
     is_memory_enough(
-        model, longest_seq, args.micro_batch_size, pad_token_id, max_seq_len, WORLD_SIZE
+        model, longest_seq, args.micro_batch_size, pad_token_id, WORLD_SIZE
     )
     print_memory_consumed(accelerator.process_index)
     sys.stdout.flush()
