@@ -81,6 +81,12 @@ class mmlu_dataset:
 
     # *********************************************************
 
+    ############
+
+    #   THIS IS THE FUNCTION FOR CONSTRUCTION FEW-SHOT PROMPTS
+
+    ############
+
     # prompt contruction.buils to operate on list of inputs.
     def construct_prompt(self, batch, tokenizer, dev_set, max_seq_len, num_few_shots):
 
@@ -249,6 +255,12 @@ class mmlu_dataset:
             mask = np.array(mask)
             final = dataset.select(mask)
         return final
+
+    #####################
+
+    # MAIN FUNCTION BELOW
+
+    #####################
 
     def construct_dataset(self):
         """
