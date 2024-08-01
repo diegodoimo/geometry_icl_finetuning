@@ -187,6 +187,7 @@ def parse_args():
     parser.add_argument("--step", type=int, default=None)
     parser.add_argument("--sample_questions", action="store_true")
     parser.add_argument("--random_order", action="store_true")
+    parser.add_argument("--few_shot_topics", action="store_true")
     args = parser.parse_args()
     return args
 
