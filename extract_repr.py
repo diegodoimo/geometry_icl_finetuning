@@ -302,12 +302,10 @@ def main():
     dataset, longest_seq = mmlu_dataset(
         tokenizer=tokenizer,
         max_seq_len=max_seq_len,
-        num_few_shots=args.num_few_shots,
         accelerator=accelerator,
+        num_few_shots=args.num_few_shots,
         num_processes=args.preprocessing_num_workers,
         split=args.split,
-        aux_few_shot=args.aux_few_shot,
-        random_order=args.random_order,
     ).construct_dataset()
 
     accelerator.print("num few shots:", args.num_few_shots)
