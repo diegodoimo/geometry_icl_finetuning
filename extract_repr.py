@@ -366,7 +366,6 @@ def main():
         maxk=args.maxk,
         dirpath=dirpath,
         filename=args.out_filename,
-        use_last_token=args.use_last_token,
         remove_duplicates=args.remove_duplicates,
         save_distances=args.save_distances,
         save_repr=args.save_repr,
