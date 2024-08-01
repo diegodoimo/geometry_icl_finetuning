@@ -35,6 +35,8 @@ torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:0 \
     --num_few_shots 5 \
     --save_distances \
     --save_repr \
+    --dataset_name "scienceqa" \
+    --dataset_path "/orfeo/cephfs/scratch/area/ddoimo/open/geometric_lens/repo/diego/science_qa"
     #--seed $seed \
     #--finetuned_path  "/u/area/ddoimo/ddoimo/finetuning_llm/open-instruct/results" \
     #--finetuned_mode "dev_val_balanced_20samples" \

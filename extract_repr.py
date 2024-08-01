@@ -13,6 +13,7 @@ from utils.helpers_extract import get_target_layers
 from utils.model_utils import get_model
 from utils.dataloader_utils import get_dataloader
 from utils.dataset_utils import mmlu_dataset
+from utils.scienceqa import scienceqa_dataset
 from utils.tokenizer_utils import get_tokenizer
 from extraction.compute_distances import estract_representations
 import torch
@@ -38,9 +39,18 @@ def parse_args():
         description="Finetune a transformers model on a causal language modeling task"
     )
     parser.add_argument(
+        "--dataset_name",
+        type=str,
+        default="mmlu",
+    )
+    parser.add_argument(
+        "--dataset_path",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
         "--checkpoint_dir",
         type=str,
-        help="Path to pretrained model or model identifier from huggingface.co/models.",
         required=False,
     )
     parser.add_argument(
@@ -175,18 +185,7 @@ def parse_args():
     )
     parser.add_argument("--ckpt_epoch", type=int, default=None)
     parser.add_argument("--step", type=int, default=None)
-    parser.add_argument("--dummy", action="store_true")
-    parser.add_argument("--gibberish", action="store_true")
-    parser.add_argument("--random_subject", action="store_true")
-    parser.add_argument("--wrong_answers", action="store_true")
     parser.add_argument("--sample_questions", action="store_true")
-    parser.add_argument("--declarative", action="store_true")
-    parser.add_argument("--prompt_search", action="store_true")
-    parser.add_argument("--aux_few_shot", action="store_true")
-    parser.add_argument("--only_question", action="store_true")
-    parser.add_argument("--only_answer", action="store_true")
-    parser.add_argument("--skip_answer", action="store_true")
-    parser.add_argument("--skip_choices", action="store_true")
     parser.add_argument("--random_order", action="store_true")
     args = parser.parse_args()
     return args
@@ -299,14 +298,39 @@ def main():
     accelerator.print("model loaded. \n\n")
     sys.stdout.flush()
 
-    dataset, longest_seq = mmlu_dataset(
-        tokenizer=tokenizer,
-        max_seq_len=max_seq_len,
-        accelerator=accelerator,
-        num_few_shots=args.num_few_shots,
-        num_processes=args.preprocessing_num_workers,
-        split=args.split,
-    ).construct_dataset()
+    if args.dataset_name == "mmlu":
+        dataset_class = mmlu_dataset(
+            tokenizer=tokenizer,
+            max_seq_len=max_seq_len,
+            accelerator=accelerator,
+            num_few_shots=args.num_few_shots,
+            num_processes=args.preprocessing_num_workers,
+            split=args.split,
+        )
+
+    elif args.dataset_name == "scienceqa":
+        accelerator.print("dataset: scienceqa")
+        accelerator.print(f"num_few_shots: {args.num_few_shots}")
+        if args.few_shot_topics:
+            accelerator.print("subjects = topics")
+        else:
+            accelerator.print("subjects = category")
+        if args.prompt_mmlu:
+            accelerator.print("mmlu prompt")
+
+        dataset_class = scienceqa_dataset(
+            dataset_path=args.dataset_path,
+            tokenizer=tokenizer,
+            max_seq_len=max_seq_len,
+            num_few_shots=args.num_few_shots,
+            accelerator=accelerator,
+            num_processes=args.preprocessing_num_workers,
+            split=args.split,
+            prompt_mmlu=args.prompt_mmlu,
+            few_shot_topics=args.few_shot_topics,
+        )
+
+    dataset, longest_seq = dataset_class.construct_dataset()
 
     accelerator.print("num few shots:", args.num_few_shots)
     accelerator.print("max_seq_len:", len(longest_seq["input_ids"][0]))
@@ -349,9 +373,17 @@ def main():
     nsamples = len(dataloader.dataset)
     accelerator.print("num_total_samples", nsamples)
 
-    inner_path = (
-        f"evaluated_{args.split}/random_order/{model_name}/{args.num_few_shots}shot"
-    )
+    inner_path = f"{args.dataset_name}"
+    if args.dataset_name == "scienceqa":
+        # some opttions for the scienceqa dataset are save in different categories
+        if args.few_shot_topics:
+            inner_path += "few_shot_topics/"
+        else:
+            inner_path += "few_shot_category/"
+        if args.prompt_mmlu:
+            inner_path += "prompt_mmlu/"
+
+    inner_path += f"evaluated_{args.split}/{model_name}/{args.num_few_shots}shot"
 
     if args.finetuned_path:
         inner_path = f"finetuned_{args.finetuned_mode}/evaluated_{args.split}/{model_name}/{args.finetuned_epochs}epochs/{ckpt}"
