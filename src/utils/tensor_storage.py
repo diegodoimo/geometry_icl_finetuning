@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 import re
 import pickle
-from jaxtyping import Float, Int, Bool, Tensor
+from jaxtyping import Float, Int, Bool
 from typing import Tuple, \
                    Optional, \
                    LiteralString, \
@@ -113,7 +113,6 @@ def retrieve_from_storage(
         storage_path: Path,
         instances_per_sub: Optional[int] = -1,
         full_tensor: Bool = False,
-        layers: Optional[List[int]] = None,
         ) -> Union[Float[Array, "num_instances num_layers d_model"],
                    Dict[str, Int[Array, "num_layers num_instances"]]] | \
                     Union[Tuple[Float[Array, "num_instances num_layers nearest_neigh"], 
@@ -138,9 +137,7 @@ def retrieve_from_storage(
           .
     """
     storage_path = Path(storage_path)
-    # if mask_path:
-    #     path_mask = Path(mask_path)
-
+    
     if not storage_path.exists() or not storage_path.is_dir():
         raise DataRetrievalError(f"Storage path does not exist:"
                                 f"{storage_path}")
@@ -155,7 +152,7 @@ def retrieve_from_storage(
     
     files = os.listdir(storage_path)
     if full_tensor:
-        hidden_states, logits = merge_torch_tensors(
+        hidden_states, logits = merge_tensors(
             storage_path, files
         )
         num_layers = hidden_states.shape[0]
@@ -170,14 +167,14 @@ def retrieve_from_storage(
             labels["predictions"] = labels["predictions"][:, indices]
         return hidden_states, labels, num_layers
     else:
-        mat_dist, md_logits = merge_numpy_array(
+        mat_dist, md_logits = merge_tensors(
             "dist", storage_path, files
         )
-        mat_coord, mc_logits = merge_numpy_array(
+        mat_coord, mc_logits = merge_tensors(
             "index", storage_path, files
         )
         
-        inverse_out = merge_numpy_array(
+        inverse_out = merge_tensors(
             "inverse", storage_path, files
         )
         if not inverse_out:
