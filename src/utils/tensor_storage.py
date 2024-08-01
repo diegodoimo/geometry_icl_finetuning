@@ -9,44 +9,76 @@ import os
 from pathlib import Path
 import re
 import pickle
-from jaxtyping import Float, Int, Bool
-from typing import Tuple, Optional, LiteralString, List, Union, Dict
+from jaxtyping import Float, Int, Bool, Tensor
+from typing import Tuple, \
+                   Optional, \
+                   LiteralString, \
+                   List, \
+                   Union, \
+                   Dict, \
+                   Literal 
 
 
-def merge_torch_tensors(
-        storage_path: Path,
-        files: List[str]
-        ) -> Tuple[Float[Array, "num_layers num_instances d_model"],
-                   Float[Array, "num_instances d_vocab"]]:
-    pattern_string = f"l(\d+)_target.pt"
-    pattern = re.compile(pattern_string)    
-    
-    filtered_files = [file for file in files if pattern.match(file)]
+def load(path: Union[str, Path]
+         ) -> Union[np.ndarray, torch.Tensor]:
+    if path.suffix == ".npy":
+        return np.load(path)
+    elif path.suffix == ".pt":
+        return torch.load(path)
+    else:
+        raise ValueError(f"Unsupported file format: {path.suffix}")
 
-    # Sort files based on the number in the filename
-    filtered_files.sort(key=lambda x: int(pattern.match(x).group(1)))
 
-    # Load tensors and add them to a list
-    tensors = [
-        torch.load(os.path.join(storage_path, file),
-                   weights_only=True)
-        for file in filtered_files
-    ]
+def stack(tensors: List[Union[np.ndarray, torch.Tensor]],
+          axis: int = 0):
+    if isinstance(tensors[0], torch.Tensor):
+        return torch.stack([t if isinstance(t, torch.Tensor)
+                            else torch.from_numpy(t)
+                            for t in tensors], dim=axis)
+    else:
+        return np.stack(tensors, axis=axis)
 
-    # Stack all tensors along a new dimension
-    stacked_tensor = torch.stack(tensors[:-1])
-    logits = tensors[-1]
-    return stacked_tensor.float().cpu().numpy()[1:], logits.float().cpu().numpy()[1:]
+
+def concatenate(tensors: List[Union[np.ndarray, torch.Tensor]],
+                axis: int = 0):
+    if isinstance(tensors[0], torch.Tensor):
+        return torch.cat([t if isinstance(t, torch.Tensor)
+                          else torch.from_numpy(t)
+                          for t in tensors], dim=axis)
+    else:
+        return np.concatenate(tensors, axis=axis)
+
+
+def save(data: Union[np.ndarray, torch.Tensor],
+         path: Union[str, Path]):
+    if path.suffix == ".pt":
+        torch.save(data, path)
+    elif path.suffix == ".npy":
+        np.save(path, data)
+    else:
+        raise ValueError(f"Unsupported file format: {path.suffix}")
 
 
 def merge_tensors(
-        type: LiteralString,
+        type: Literal["npy", "pt"],
+        request: Literal["dist", "index", "inverse"],
         storage_path: Path,
         files: List[str]
-        ) -> Tuple[Float[Array, "num_layers num_instances d_model"],
-                   Float[Array, "num_instances d_vocab"]]:
+        ) -> Union[Tuple[Float[torch.Tensor, "num_layers num_instances d_model"],
+                   Float[torch.Tensor, "num_instances d_vocab"]],
+                   Tuple[Float[Array, "num_layers num_instances d_model"],
+                   Float[Array, "num_instances d_vocab"]]]:
+    """
+    The extraction pipeline for the tensors stored in the storage path.
+    """
 
-    pattern_string = f"l(\d+)_target_{type}\.npy"
+    if type == "pt":
+        pattern_string = f"l(\d+)_target.pt"
+    elif type == "npy":
+        pattern_string = f"l(\d+)_target_{request}\.npy"
+    else:
+        raise ValueError(f"Unsupported file format: {type}")
+    
     pattern = re.compile(pattern_string)    
     
     filtered_files = [file for file in files if pattern.match(file)]
@@ -57,16 +89,24 @@ def merge_tensors(
     # Check if the filea exist
     if len(filtered_files) == 0:
         return None
+    
     # Load tensors and add them to a list
     tensors = [
-        np.load(os.path.join(storage_path, file))
+        load(os.path.join(storage_path, file))
         for file in filtered_files
     ]
 
     # Stack all tensors along a new dimension
-    stacked_tensor = np.stack(tensors[:-1])
+    stacked_tensor = stack(tensors[:-1])
     logits = tensors[-1]
-    return stacked_tensor, logits
+    
+    if type == "pt":
+        return stacked_tensor.float().cpu().numpy()[1:], \
+               logits.float().cpu().numpy()[1:]
+    elif type == "npy":
+        return stacked_tensor, logits
+
+
 
 
 def retrieve_from_storage(
@@ -130,14 +170,14 @@ def retrieve_from_storage(
             labels["predictions"] = labels["predictions"][:, indices]
         return hidden_states, labels, num_layers
     else:
-        mat_dist, md_logits = merge_tensors(
+        mat_dist, md_logits = merge_numpy_array(
             "dist", storage_path, files
         )
-        mat_coord, mc_logits = merge_tensors(
+        mat_coord, mc_logits = merge_numpy_array(
             "index", storage_path, files
         )
         
-        inverse_out = merge_tensors(
+        inverse_out = merge_numpy_array(
             "inverse", storage_path, files
         )
         if not inverse_out:

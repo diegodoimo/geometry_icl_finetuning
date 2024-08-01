@@ -16,34 +16,25 @@ from typing import Tuple
 
 
 class IntrinsicDimension():
-    def __init__(self,
-                 path: Path,
-                 parallel: Bool = True,
-                ):
-        self.path = path
-        self.parallel = parallel
-
+    def __init__(self):
+        pass
     def main(self,
-             instance_per_sub: Int = -1,
-             full_tensor: Bool = False) -> pd.DataFrame:
+             tensors: Float[Array, "num_layers num_instances d_model"] |
+                Tuple[Float[Array, "num_layers num_instances nearest_neigh"]],
+             number_of_layers: Int,
+             parallel: Bool = True
+             ) -> Float[Array, "order_of_nearest_neighbour num_layers"]:
         """
         Compute the intrinsic dimension of the hidden states of a model
         Returns
-            pd.DataFrame
-                DataFrame with the intrinsic dimension of the hidden states
+            Float[Array, "order_of_nearest_neighbour num_layers"]
         """
         module_logger = logging.getLogger(__name__)
         module_logger.info("Computing ID")
 
         try:
-            
-            out_from_storage = retrieve_from_storage(self.path,
-                                                     instance_per_sub,
-                                                     full_tensor)
-            
-            tensors, _, number_of_layers = out_from_storage
             id_per_layer_gride = (
-                self.parallel_compute(number_of_layers, tensors)
+                self.parallel_compute(number_of_layers, tensors, parallel)
             )
         except DataRetrievalError as e:
             module_logger.error(
@@ -68,6 +59,7 @@ class IntrinsicDimension():
             number_of_layers: Int,
             tensors: Float[Array, "num_layers num_instances d_model"] | 
             Tuple[Float[Array, "num_layers num_instances nearest_neigh"]],
+            parallel: Bool = True
             
     ) -> Float[Array, "order_of_nearest_neighbour num_layers"]:
         """
@@ -92,7 +84,7 @@ class IntrinsicDimension():
         process_layer = partial(
             self.process_layer, tensors=tensors
         )
-        if self.parallel:
+        if parallel:
             # Parallelize the computation of the metric
             # If the program crash try reducing the number of jobs
             with Parallel(n_jobs=-1) as parallel:
