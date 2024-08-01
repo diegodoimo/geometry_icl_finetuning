@@ -315,7 +315,6 @@ def main():
         dataset,
         args.micro_batch_size,
         pad_token_id,
-        max_seq_len=max_seq_len,
         world_size=WORLD_SIZE,
         shuffle=False,
         num_processes=args.preprocessing_num_workers,
