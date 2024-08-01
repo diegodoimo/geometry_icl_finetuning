@@ -10,7 +10,7 @@
 #SBATCH --gres=gpu:1
 
 
-source /u/area/ddoimo/anaconda3/bin/activate ./env_amd
+source /u/area/ddoimo/anaconda3/bin/activate ./env_emd
 export OMP_NUM_THREADS=32
 export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 

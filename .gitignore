@@ -2,6 +2,7 @@ repr_tmp
 results*
 env/
 env_amd/
+env_emd/
 slurm*
 !slurm_runner.py
 results/
