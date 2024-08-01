@@ -83,7 +83,7 @@ class mmlu_dataset:
 
     ############
 
-    #   THIS IS THE FUNCTION FOR CONSTRUCTION FEW-SHOT PROMPTS
+    #  THIS IS THE FUNCTION FOR CONSTRUCTION FEW-SHOT PROMPTS
 
     ############
 
