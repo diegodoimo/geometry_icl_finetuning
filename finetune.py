@@ -590,7 +590,7 @@ def main():
             filename=filename,
             acc_val=acc,
         )
-    assert False
+
     accelerator.print("start training")
     accelerator.print("memory before train run")
     sys.stdout.flush()
