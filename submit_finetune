@@ -63,7 +63,7 @@ srun torchrun \
     --weight_samples \
     --use_flash_attn \
     --measure_baselines
-#--activation_checkpointing \
+    #--activation_checkpointing \
     #--weight_samples \
 
 
