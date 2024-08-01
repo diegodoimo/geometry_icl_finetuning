@@ -304,7 +304,6 @@ def main():
         max_seq_len=max_seq_len,
         num_few_shots=args.num_few_shots,
         accelerator=accelerator,
-        subject=None,
         num_processes=args.preprocessing_num_workers,
         split=args.split,
         aux_few_shot=args.aux_few_shot,

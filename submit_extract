@@ -33,7 +33,6 @@ torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:0 \
     --max_seq_len 4090 \
     --split "test" \
     --num_few_shots 5 \
-    --sample_same_questions \
     --save_distances \
     --save_repr \
     #--seed $seed \
