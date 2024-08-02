@@ -14,6 +14,7 @@ from utils.model_utils import get_model
 from utils.dataloader_utils import get_dataloader
 from utils.dataset_utils import mmlu_dataset
 from utils.scienceqa import scienceqa_dataset
+from utils.mmlu_pro_race import mmlu_pro_race
 from utils.tokenizer_utils import get_tokenizer
 from extraction.compute_distances import estract_representations
 import torch
@@ -330,6 +331,16 @@ def main():
             split=args.split,
             prompt_mmlu=args.prompt_mmlu,
             few_shot_topics=args.few_shot_topics,
+        )
+    elif args.dataset_name == "mmlu_pro_race":
+        dataset_class = mmlu_pro_race(
+            dataset_path=args.dataset_path,
+            tokenizer=tokenizer,
+            max_seq_len=max_seq_len,
+            num_few_shots=args.num_few_shots,
+            accelerator=accelerator,
+            num_processes=args.preprocessing_num_workers,
+            split=args.split,
         )
 
     dataset, longest_seq = dataset_class.construct_dataset()
