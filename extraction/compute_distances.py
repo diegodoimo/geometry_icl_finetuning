@@ -102,7 +102,7 @@ def estract_representations(
 
                     start = time.time()
                     distances, dist_index, mus, _ = compute_distances(
-                        X=act,
+                        x=act,
                         n_neighbors=maxk + 1,
                         n_jobs=1,
                         working_memory=2048,
