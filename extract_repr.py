@@ -396,7 +396,7 @@ def main():
         if args.prompt_mmlu:
             inner_path += "/prompt_mmlu/"
 
-    inner_path += f"evaluated_{args.split}/{model_name}/{args.num_few_shots}shot"
+    inner_path += f"/evaluated_{args.split}/{model_name}/{args.num_few_shots}shot"
 
     if args.finetuned_path:
         inner_path = f"finetuned_{args.finetuned_mode}/evaluated_{args.split}/{model_name}/{args.finetuned_epochs}epochs/{ckpt}"

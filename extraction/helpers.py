@@ -112,6 +112,7 @@ def remove_duplicates_func(act, accelerator):
 
     act, idx, inverse = np.unique(act, axis=0, return_index=True, return_inverse=True)
     accelerator.print(len(idx), len(inverse))
+    save_backward_indices=False
     if len(idx) == len(inverse):
         # if no overlapping data has been found return the original ordred array
         assert len(np.unique(inverse)) == len(inverse)
