@@ -229,20 +229,12 @@ class mmlu_pro_race:
             "attention_mask": attention_mask,
         }
 
-    def construct_balanced(self, samples_per_subject, split, mask_path):
+    def construct_balanced(self, dataset, samples_per_subject, mask_path):
         assert samples_per_subject is not None or mask_path is not None
 
-        dataset = load_dataset("cais/mmlu", "all", split=split)
-
         if self.mask_path is not None:
-            mask = np.load(self.mask_path)
+            mask = np.load(f"{self.mask_path}/mask_{samples_per_subject}.npy")
             final = dataset.select(mask)
-            frequences = Counter(final["subject"]).values()
-
-            if self.split == "test":
-                assert len(np.unique(list(frequences))) == 1
-                assert np.unique(list(frequences))[0] == 100
-                assert mask.shape[0] == 5700
 
         else:
             subjects = np.array(dataset["subject"])
@@ -268,6 +260,12 @@ class mmlu_pro_race:
         if self.split == "train":
             assert self.num_few_shots == 0
             dataset = load_from_disk(f"{self.dataset_path}/train")
+            if self.samples_per_subject is not None:
+                dataset = self.construct_balanced(
+                    dataset,
+                    mask_path=self.mask_path,
+                    samples_per_subject=self.samples_per_subject,
+                )
 
         else:
             dataset = load_from_disk(f"{self.dataset_path}/test")
