@@ -264,9 +264,6 @@ class mmlu_pro_race:
     #####################
 
     def construct_dataset(self):
-        """
-        Construct the request instances for the scenario
-        """
 
         if self.split == "train":
             assert self.num_few_shots == 0

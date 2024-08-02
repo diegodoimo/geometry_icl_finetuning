@@ -42,6 +42,7 @@ from utils.helpers_finetune import (
     save_statistics,
 )
 from utils.dataset_utils import mmlu_dataset
+from utils.mmlu_pro_race import mmlu_pro_race
 from utils.dataloader_utils import get_dataloader
 from utils.tokenizer_utils import get_tokenizer
 from utils.optimizer_utils import get_optimizer, get_scheduler
@@ -59,6 +60,12 @@ def parse_args():
     )
     parser.add_argument(
         "--dataset_name",
+        type=str,
+        default="mmlu",
+        help="The name of the dataset to use (via the datasets library).",
+    )
+    parser.add_argument(
+        "--dataset_path",
         type=str,
         default=None,
         help="The name of the dataset to use (via the datasets library).",
@@ -301,42 +308,6 @@ def main():
         gradient_accumulation_steps=gradient_accumulation_steps, fsdp_plugin=fsdp_plugin
     )
 
-    # def lambda_fn(module: torch.nn.Module):
-    #     if isinstance(module, LlamaDecoderLayer):
-    #         return True  # like transformer_auto_wrap_policy
-    #     if isinstance(module, torch.nn.Linear) and all(
-    #         p.requires_grad for p in module.parameters()
-    #     ):
-    #         return True  # wrap each trainable linear separately
-    #     return False
-
-    # auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
-
-    # sharding_strategy=ShardingStrategy.NO_SHARD
-    # if WORLD_SIZE > 1:
-    #     sharding_strategy=ShardingStrategy.FULL_SHARD
-    # fsdp_plugin = FullyShardedDataParallelPlugin(
-    #     sharding_strategy=sharding_strategy,
-    #     backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
-    #     auto_wrap_policy=auto_wrap_policy,
-    #     cpu_offload=False,
-    #     ignored_modules=None,
-    #     limit_all_gathers=True,
-    #     use_orig_params=True,
-    #     param_init_fn=None,
-    #     sync_module_states=True,
-    #     forward_prefetch=False,
-    #     activation_checkpointing=False,
-    # )
-
-    # gradient_accumulation_steps, args.batch_size = find_grad_accumulation_steps(
-    #     args=args, world_size=WORLD_SIZE
-    # )
-
-    # accelerator = Accelerator(
-    #     gradient_accumulation_steps=gradient_accumulation_steps,
-    #     fsdp_plugin=fsdp_plugin,
-    # )
     # Make one log on every process with the configuration for debugging.
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -357,7 +328,7 @@ def main():
         set_seed(args.seed)
 
     if accelerator.is_main_process:
-        args.output_dir += "/dev_val_balanced"
+        args.output_dir += f"{args.dataset_name}/dev_val_balanced"
         if args.samples_per_subject is not None:
             args.output_dir += f"_{args.samples_per_subject}samples"
 
@@ -422,32 +393,41 @@ def main():
     accelerator.print("max_seq_len: ", max_seq_len)
 
     accelerator.print("preparing training set")
-    train_dataset, _ = mmlu_dataset(
+    dataset_class = mmlu_dataset
+    dataset_path = None
+    if args.dataset_name == "mmlu_pro_race":
+        dataset_class = mmlu_pro_race
+        dataset_path = args.dataset_path
+
+    train_dataset, _ = dataset_class(
         tokenizer=tokenizer,
         max_seq_len=max_seq_len,
         accelerator=accelerator,
         num_processes=args.preprocessing_num_workers,
         split="train",
         samples_per_subject=args.samples_per_subject,
+        dataset_path=dataset_path,
     ).construct_dataset()
     accelerator.print(f"num_samples = {len(train_dataset)}")
 
     accelerator.print("preparing validation set")
-    val_dataset, _ = mmlu_dataset(
+    val_dataset, _ = dataset_class(
         tokenizer=tokenizer,
         max_seq_len=max_seq_len,
         accelerator=accelerator,
         num_processes=args.preprocessing_num_workers,
         split="validation",
+        datset_path=dataset_path,
     ).construct_dataset()
 
     accelerator.print("preparing test set")
-    test_dataset, _ = mmlu_dataset(
+    test_dataset, _ = dataset_class(
         tokenizer=tokenizer,
         max_seq_len=max_seq_len,
         accelerator=accelerator,
         num_processes=args.preprocessing_num_workers,
         split="test",
+        dataset_path=dataset_path,
     ).construct_dataset()
 
     int_to_subject = {
@@ -590,7 +570,7 @@ def main():
             filename=filename,
             acc_val=acc,
         )
-    assert False
+
     accelerator.print("start training")
     accelerator.print("memory before train run")
     sys.stdout.flush()

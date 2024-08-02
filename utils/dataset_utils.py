@@ -52,6 +52,7 @@ class mmlu_dataset:
         split="test",
         mask_path=None,
         samples_per_subject=None,
+        dataset_path=None,
     ):
 
         self.dataset = "mmlu"
