@@ -390,11 +390,11 @@ def main():
     if args.dataset_name == "scienceqa":
         # some opttions for the scienceqa dataset are save in different categories
         if args.few_shot_topics:
-            inner_path += "few_shot_topics/"
+            inner_path += "/few_shot_topics/"
         else:
-            inner_path += "few_shot_category/"
+            inner_path += "/few_shot_category/"
         if args.prompt_mmlu:
-            inner_path += "prompt_mmlu/"
+            inner_path += "/prompt_mmlu/"
 
     inner_path += f"evaluated_{args.split}/{model_name}/{args.num_few_shots}shot"
 
