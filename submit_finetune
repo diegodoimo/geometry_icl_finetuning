@@ -43,6 +43,7 @@ srun torchrun \
     --datset $dataset \
     --dataset_path $dataset_path \
     --mask_path $dataset_path \
+    s--samples_per_subject $samples_per_subject \
     --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/models/$folder/models_hf/$model_name \
     --tokenizer_name /orfeo/cephfs/scratch/area/ddoimo/models/$folder/models_hf/$model_name \
     --use_lora \
@@ -61,7 +62,6 @@ srun torchrun \
     --weight_decay 0.0  \
     --num_train_epochs 4 \
     --output_dir "./results/${model_name}/" \
-    --samples_per_subject $samples_per_subject \
     --out_filename ""  \
     --checkpointing_steps 10 \
     --logging_steps 20 \
