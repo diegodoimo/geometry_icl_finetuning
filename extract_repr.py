@@ -333,6 +333,7 @@ def main():
             few_shot_topics=args.few_shot_topics,
         )
     elif args.dataset_name == "mmlu_pro_race":
+        subject = ["biology", "business"]
         dataset_class = mmlu_pro_race(
             dataset_path=args.dataset_path,
             tokenizer=tokenizer,
@@ -341,6 +342,7 @@ def main():
             accelerator=accelerator,
             num_processes=args.preprocessing_num_workers,
             split=args.split,
+            subject=subject,
         )
 
     dataset, longest_seq = dataset_class.construct_dataset()
