@@ -53,6 +53,7 @@ class mmlu_pro_race:
         split="test",
         mask_path=None,
         samples_per_subject=None,
+        subject=None,
     ):
 
         self.dataset_path = dataset_path
@@ -66,6 +67,7 @@ class mmlu_pro_race:
         self.split = split
         self.mask_path = mask_path
         self.samples_per_subject = samples_per_subject
+        self.subject = subject
 
     # ****************************************************
     def construct_question(self, question, choices, answer, include_answer=False):
@@ -269,12 +271,21 @@ class mmlu_pro_race:
 
         else:
             dataset = load_from_disk(f"{self.dataset_path}/test")
+            if self.subject is not None:
+                dataset = dataset.filter(
+                    lambda example: example["subject"] in self.subject
+                )
 
         few_shot_dataset = None
         if self.num_few_shots > 0:
             if self.num_few_shots > 5:
                 assert False
             few_shot_dataset = load_from_disk(f"{self.dataset_path}/dev")
+
+            if self.subject is not None:
+                dataset = dataset.filter(
+                    lambda example: example["subject"] in self.subject
+                )
 
         # *********************************************************************************
         # contruct prompt and tokenize
