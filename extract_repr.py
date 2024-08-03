@@ -186,6 +186,7 @@ def parse_args():
     )
     parser.add_argument("--ckpt_epoch", type=int, default=None)
     parser.add_argument("--step", type=int, default=None)
+    parser.add_argument("--dev_index", type=int, default=None)
     parser.add_argument("--sample_questions", action="store_true")
     parser.add_argument("--random_order", action="store_true")
     parser.add_argument("--few_shot_topics", action="store_true")
@@ -334,6 +335,8 @@ def main():
         )
     elif args.dataset_name == "mmlu_pro_race":
         subject = ["biology", "business"]
+        if args.dev_index is not None:
+            print(args.dev_index)
         dataset_class = mmlu_pro_race(
             dataset_path=args.dataset_path,
             tokenizer=tokenizer,
@@ -343,6 +346,7 @@ def main():
             num_processes=args.preprocessing_num_workers,
             split=args.split,
             subject=subject,
+            dev_index=args.dev_index,
         )
 
     dataset, longest_seq = dataset_class.construct_dataset()

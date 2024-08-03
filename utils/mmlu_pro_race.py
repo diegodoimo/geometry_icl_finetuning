@@ -54,6 +54,7 @@ class mmlu_pro_race:
         mask_path=None,
         samples_per_subject=None,
         subject=None,
+        dev_index=None,
     ):
 
         self.dataset_path = dataset_path
@@ -68,6 +69,7 @@ class mmlu_pro_race:
         self.mask_path = mask_path
         self.samples_per_subject = samples_per_subject
         self.subject = subject
+        self.dev_index = dev_index
 
     # ****************************************************
     def construct_question(self, question, choices, answer, include_answer=False):
@@ -280,7 +282,10 @@ class mmlu_pro_race:
         if self.num_few_shots > 0:
             if self.num_few_shots > 5:
                 assert False
-            few_shot_dataset = load_from_disk(f"{self.dataset_path}/dev")
+            index = ""
+            if self.dev_index is not None:
+                index = self.dev_index
+            few_shot_dataset = load_from_disk(f"{self.dataset_path}/dev{index}")
 
             if self.subject is not None:
                 dataset = dataset.filter(
