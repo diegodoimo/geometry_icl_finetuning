@@ -16,8 +16,8 @@ def get_target_layers(
 
     prefix = "module."
     middle = ""
-    # accelerate does not cast to bf16 a DDP model yet
-    if world_size > 0:
+    # ?? accelerate does not cast to bf16 a DDP model yet
+    if world_size > 1:
         prefix = "_fsdp_wrapped_module."
         if map_names[option] != "":
             middle = "._fsdp_wrapped_module"
