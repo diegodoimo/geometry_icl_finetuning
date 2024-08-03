@@ -34,7 +34,7 @@ torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:0 \
     --split "test" \
     --num_few_shots 5 \
     --dataset_name "mmlu_pro_race" \
-    --dataset_path "/orfeo/cephfs/scratch/area/ddoimo/open/geometric_lens/repo/diego/mmlu_pro_race"
+    --dataset_path "/orfeo/cephfs/scratch/area/ddoimo/open/geometric_lens/repo/diego/mmlu_pro_race"\
     #--save_distances \
     #--save_repr \
     
