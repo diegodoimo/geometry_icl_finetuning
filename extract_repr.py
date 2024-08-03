@@ -208,25 +208,26 @@ def lambda_fn(module: torch.nn.Module):
 def main():
     args = parse_args()
 
+    os.environ["ACCELERATE_MIXED_PRECISION"] = "bf16"
+    fsdp_plugin = None
     if WORLD_SIZE > 1:
         os.environ["ACCELERATE_USE_FSDP"] = "true"
-        os.environ["ACCELERATE_MIXED_PRECISION"] = "bf16"
 
-    auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
+        auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
 
-    fsdp_plugin = FullyShardedDataParallelPlugin(
-        sharding_strategy=ShardingStrategy.FULL_SHARD,
-        backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
-        auto_wrap_policy=auto_wrap_policy,
-        cpu_offload=False,
-        ignored_modules=None,
-        limit_all_gathers=True,
-        use_orig_params=True,
-        param_init_fn=None,
-        sync_module_states=True,
-        forward_prefetch=False,
-        activation_checkpointing=False,
-    )
+        fsdp_plugin = FullyShardedDataParallelPlugin(
+            sharding_strategy=ShardingStrategy.FULL_SHARD,
+            backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
+            auto_wrap_policy=auto_wrap_policy,
+            cpu_offload=False,
+            ignored_modules=None,
+            limit_all_gathers=True,
+            use_orig_params=True,
+            param_init_fn=None,
+            sync_module_states=True,
+            forward_prefetch=False,
+            activation_checkpointing=False,
+        )
 
     accelerator = Accelerator(fsdp_plugin=fsdp_plugin)
 
