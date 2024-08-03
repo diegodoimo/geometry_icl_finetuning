@@ -351,6 +351,7 @@ def main():
         use_flash_attention_2=args.use_flash_attn,
         activation_checkpointing=args.activation_checkpointing,
     )
+    vocab_size = model.config.vocab_size
 
     if args.use_lora:
         from peft import LoraConfig, TaskType, get_peft_model
@@ -620,7 +621,7 @@ def main():
                     logits=outputs.logits,
                     labels=batch["labels"],
                     weights=batch["weight"],
-                    vocab_size=model.config.vocab_size,
+                    vocab_size=vocab_size,
                 )
 
                 # We keep track of the loss at each logged step
