@@ -22,7 +22,7 @@ def get_target_layers(
         if map_names[option] != "":
             middle = "._fsdp_wrapped_module"
     if finetuned:
-        prefix += "base_model.model."
+        prefix = "base_model.model."
 
     target_layers = {
         i: f"{prefix}model.layers.{i}{middle}{suffix}" for i in range(0, n_layer, every)
