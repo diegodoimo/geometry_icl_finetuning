@@ -417,7 +417,7 @@ def main():
         accelerator=accelerator,
         num_processes=args.preprocessing_num_workers,
         split="validation",
-        datset_path=dataset_path,
+        dataset_path=dataset_path,
     ).construct_dataset()
 
     accelerator.print("preparing test set")
