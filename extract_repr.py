@@ -275,12 +275,11 @@ def main():
         accelerator.print("loading pretrained peft models")
         if args.ckpt_epoch is not None:
             ckpt = f"epoch_{args.ckpt_epoch}"
-            finetune_details = f"{model_name}/{args.finetuned_mode}/{args.finetuned_epochs}epochs/{ckpt}"
+            finetune_details = f"{model_name}/{args.dataset_name}/{args.finetuned_mode}/{args.finetuned_epochs}epochs/{ckpt}"
         elif args.step is not None:
             assert args.split == "dev+validation"
-
             ckpt = f"10ckpts/step_{args.step}"
-            finetune_details = f"{model_name}/{args.finetuned_mode}/{args.finetuned_epochs}epochs/{ckpt}"
+            finetune_details = f"{model_name}/{args.dataset_name}/{args.finetuned_mode}/{args.finetuned_epochs}epochs/{ckpt}"
         path = f"{args.finetuned_path}/{finetune_details}"
         model = PeftModel.from_pretrained(model, path)
         model.print_trainable_parameters()
