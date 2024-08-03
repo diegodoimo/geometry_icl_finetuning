@@ -61,8 +61,8 @@ def is_memory_enough(model, longest_seq, micro_batch_size, pad_token_id, world_s
     )
 
     for i, batch in enumerate(longest_loader):
-        batch = {key: val.to("cuda") for key, val in batch.items()}
-
+        if world_size == 1:
+            batch = {key: val.to("cuda") for key, val in batch.items()}
         _ = model(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"])
 
     torch.cuda.empty_cache()
