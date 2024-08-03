@@ -274,7 +274,7 @@ class mmlu_pro_race:
         if self.num_few_shots > 0:
             if self.num_few_shots > 5:
                 assert False
-            few_shot_dataset = load_from_disk(f"{self.dataset_path}/dev")
+            few_shot_dataset = load_from_disk(f"{self.dataset_path}/new/dev")
 
         # *********************************************************************************
         # contruct prompt and tokenize
