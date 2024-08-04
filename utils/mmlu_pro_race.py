@@ -1,4 +1,4 @@
-from datasets import load_dataset
+from datasets import load_dataset, concatenate_datasets
 import torch
 from functools import partial
 from datasets.utils.logging import disable_progress_bar
@@ -7,7 +7,7 @@ import numpy as np
 from datasets import load_dataset, load_from_disk
 from collections import Counter
 
-rng = np.random.default_rng(42)
+
 disable_progress_bar()
 
 IGNORE_INDEX = -100
@@ -55,6 +55,9 @@ class mmlu_pro_race:
         samples_per_subject=None,
         subject=None,
         dev_index=None,
+        random_order=None,
+        sample_questions=None,
+        seed=None,
     ):
 
         self.dataset_path = dataset_path
@@ -71,6 +74,13 @@ class mmlu_pro_race:
         self.subject = subject
         self.dev_index = dev_index
 
+        self.random_order = random_order
+        self.sample_questions = sample_questions
+
+        self.rng = np.random.default_rng(42)
+        if seed is not None:
+            self.rng = np.random.default_rng(seed)
+
     # ****************************************************
     def construct_question(self, question, choices, answer, include_answer=False):
         # added strip
@@ -85,6 +95,20 @@ class mmlu_pro_race:
         return prompt
 
     # *********************************************************
+
+    def get_few_shot_dataset(
+        self,
+    ):
+
+        dev = load_from_disk(f"{self.dataset_path}/dev_best_0")
+        train = load_from_disk(f"{self.dataset_path}/train")
+
+        merged = concatenate_datasets([dev, train])
+
+        smaller_freq = np.sort(list(Counter(merged["subjects"]).values()))[0]
+        chosen_indices = self.rng.choice(5, smaller_freq, replace=False)
+
+        return merged, chosen_indices
 
     ############
 
@@ -114,7 +138,9 @@ class mmlu_pro_race:
         for i in range(len(questions)):
             prompt = f"The following are multiple choice questions (with answers) about{format_subject(subjects[i])}.\n\n"
             current_subject = subjects[i]
-            for j in range(num_few_shots):
+
+            # for j in range(num_few_shots):
+            for j in self.indices:
                 shot = local_dev_set[current_subject][j]
                 prompt += self.construct_question(
                     shot["question"],
@@ -246,7 +272,7 @@ class mmlu_pro_race:
             for sub in np.unique(subjects):
                 ind = np.nonzero(sub == subjects)[0]
                 nsamples = min(samples_per_subject, len(ind))
-                chosen = rng.choice(ind, nsamples, replace=False)
+                chosen = self.rng.choice(ind, nsamples, replace=False)
                 mask.extend(list(np.sort(chosen)))
 
             mask = np.array(mask)
@@ -291,6 +317,14 @@ class mmlu_pro_race:
                 dataset = dataset.filter(
                     lambda example: example["subject"] in self.subject
                 )
+
+        # this random order remain fixed for all the question
+        self.indices = np.arange(self.num_few_shots)
+        if self.random_order:
+            self.indices = self.rng.permutation(self.num_few_shots)
+
+        if self.sample_questions:
+            few_shot_dataset, self.indices = self.get_few_shot_dataset()
 
         # *********************************************************************************
         # contruct prompt and tokenize

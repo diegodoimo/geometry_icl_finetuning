@@ -347,6 +347,9 @@ def main():
             split=args.split,
             subject=subject,
             dev_index=args.dev_index,
+            seed=args.seed,
+            random_order=args.random_order,
+            sample_questions=args.sample_questions,
         )
 
     dataset, longest_seq = dataset_class.construct_dataset()
@@ -402,7 +405,12 @@ def main():
         if args.prompt_mmlu:
             inner_path += "/prompt_mmlu/"
 
-    inner_path += f"/evaluated_{args.split}/{model_name}/{args.num_few_shots}shot"
+    if args.sample_questions:
+        inner_path += f"/evaluated_{args.split}/sampled/{model_name}/{args.seed}/{args.num_few_shots}shot"
+    elif args.random_order:
+        inner_path += f"evaluated_{args.split}/shuffled/{model_name}/{args.seed}/{args.num_few_shots}shot"
+    else:
+        inner_path += f"/evaluated_{args.split}/{model_name}/{args.num_few_shots}shot"
 
     if args.finetuned_path:
         inner_path = f"finetuned_{args.finetuned_mode}/evaluated_{args.split}/{model_name}/{args.finetuned_epochs}epochs/{ckpt}"
