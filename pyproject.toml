@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "representation_landscape_fs_ft"
+version = "0.1.0"
+description = "The Representation Landscape of few-shot learning and fine-tuning in Large Language Models"
+authors = ["https://github.com/alexserra98","https://github.com/diegodoimo"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+dadapy = {git = "https://github.com/sissa-data-science/DADApy"}
+numpy = "1.26.4"
+torch = "^2.4.0"
+tokenizers = "^0.19.1"
+accelerate = "^0.33.0"
+transformers = "^4.43.3"
+sentencepiece = "^0.2.0"
+peft = "^0.12.0"
+jaxtyping = "^0.2.33"
+seaborn = "^0.13.2"
+matplotlib = "^3.9.1"
+einops = "^0.8.0"
+jupyterlab = "^4.2.4"
+
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
