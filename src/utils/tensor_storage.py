@@ -24,7 +24,7 @@ def load(path: Union[str, Path]
     if path.suffix == ".npy":
         return np.load(path)
     elif path.suffix == ".pt":
-        return torch.load(path)
+        return torch.load(path, weights_only=True)
     else:
         raise ValueError(f"Unsupported file format: {path.suffix}")
 
@@ -61,9 +61,9 @@ def save(data: Union[np.ndarray, torch.Tensor],
 
 def merge_tensors(
         type: Literal["npy", "pt"],
-        request: Literal["dist", "index", "inverse"],
         storage_path: Path,
-        files: List[str]
+        files: List[str],
+        request: Optional[Literal["dist", "index", "inverse"]] = None,
         ) -> Union[Tuple[Float[torch.Tensor, "num_layers num_instances d_model"],
                    Float[torch.Tensor, "num_instances d_vocab"]],
                    Tuple[Float[Array, "num_layers num_instances d_model"],
@@ -92,7 +92,7 @@ def merge_tensors(
     
     # Load tensors and add them to a list
     tensors = [
-        load(os.path.join(storage_path, file))
+        load(Path(os.path.join(storage_path, file)))
         for file in filtered_files
     ]
 
@@ -142,10 +142,13 @@ def retrieve_from_storage(
         raise DataRetrievalError(f"Storage path does not exist:"
                                 f"{storage_path}")
 
-
-
-    with open(Path(storage_path, "statistics_target.pkl"), "rb") as f:
-        stat_target = pickle.load(f)
+    path_stat_target = Path(storage_path, "statistics_target.pkl")
+    if not path_stat_target.exists():
+        with open(Path(storage_path, "statistics_target_sorted_sample42.pkl"), "rb") as f:
+            stat_target = pickle.load(f)    
+    else:
+        with open(path_stat_target, "rb") as f:
+            stat_target = pickle.load(f)
 
     labels = {"subjects": stat_target["subjects"],
               "predictions": stat_target["contrained_predictions"]}
@@ -153,7 +156,8 @@ def retrieve_from_storage(
     files = os.listdir(storage_path)
     if full_tensor:
         hidden_states, logits = merge_tensors(
-            storage_path, files
+
+            "pt", storage_path, files
         )
         num_layers = hidden_states.shape[0]
         labels["subjects"] = preprocess_label(labels["subjects"],
@@ -168,14 +172,14 @@ def retrieve_from_storage(
         return hidden_states, labels, num_layers
     else:
         mat_dist, md_logits = merge_tensors(
-            "dist", storage_path, files
+            "npy", storage_path, files, request="dist"
         )
         mat_coord, mc_logits = merge_tensors(
-            "index", storage_path, files
+            "npy", storage_path, files, request="index"
         )
         
         inverse_out = merge_tensors(
-            "inverse", storage_path, files
+            "npy", storage_path, files, request="inverse"
         )
         if not inverse_out:
             num_layers = mat_dist.shape[0]
