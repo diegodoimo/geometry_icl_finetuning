@@ -1,4 +1,4 @@
-from src.utils.annotations import Array
+from src.utils.annotations import Array, _N_JOBS
 from src.utils.error import MetricComputationError, DataRetrievalError
 from src.utils.tensor_storage import retrieve_from_storage
 import logging
@@ -56,7 +56,7 @@ class LabelClustering():
         """
         module_logger = logging.getLogger(__name__)
         module_logger.info(f"Computing label cluster")
-        
+        # import pdb; pdb.set_trace()
         try:
             
             output_dict = self.parallel_compute(
@@ -113,10 +113,11 @@ class LabelClustering():
             self.process_layer, tensors=tensors, z=z, halo=halo
         )
         results = []
+       
         if parallel:
             # Parallelize the computation of the metric
             # If the program crash try reducing the number of jobs
-            with Parallel(n_jobs=-1) as parallel:
+            with Parallel(n_jobs=_N_JOBS) as parallel:
                 results = parallel(
                     delayed(process_layer)(layer,
                                            label=labels[layer])

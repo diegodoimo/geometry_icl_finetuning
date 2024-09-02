@@ -164,6 +164,11 @@ def retrieve_from_storage(
                                               num_layers=num_layers)
         labels["predictions"] = preprocess_label(labels["predictions"],
                                                  num_layers=num_layers)
+        # beacause of inconsinstency in the data
+        min_instances = min(hidden_states.shape[0], labels["subjects"].shape[0], labels["predictions"].shape[0])
+        labels["subjects"] = labels["subjects"][:min_instances]
+        labels["predictions"] = labels["predictions"][:min_instances]
+        hidden_states = hidden_states[:min_instances]
         if instances_per_sub != -1:
             indices = sample_indices(labels["subjects"][0], instances_per_sub)
             hidden_states = hidden_states[:, indices]
