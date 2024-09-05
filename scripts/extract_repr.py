@@ -13,6 +13,8 @@ from utils.helpers_extract import get_target_layers
 from utils.model_utils import get_model
 from utils.dataloader_utils import get_dataloader
 from utils.dataset_utils import mmlu_dataset
+from utils.scienceqa import scienceqa_dataset
+from utils.mmlu_pro_race import mmlu_pro_race
 from utils.tokenizer_utils import get_tokenizer
 from extraction.compute_distances import estract_representations
 import torch
@@ -38,9 +40,18 @@ def parse_args():
         description="Finetune a transformers model on a causal language modeling task"
     )
     parser.add_argument(
+        "--dataset_name",
+        type=str,
+        default="mmlu",
+    )
+    parser.add_argument(
+        "--dataset_path",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
         "--checkpoint_dir",
         type=str,
-        help="Path to pretrained model or model identifier from huggingface.co/models.",
         required=False,
     )
     parser.add_argument(
@@ -175,19 +186,11 @@ def parse_args():
     )
     parser.add_argument("--ckpt_epoch", type=int, default=None)
     parser.add_argument("--step", type=int, default=None)
-    parser.add_argument("--dummy", action="store_true")
-    parser.add_argument("--gibberish", action="store_true")
-    parser.add_argument("--random_subject", action="store_true")
-    parser.add_argument("--wrong_answers", action="store_true")
+    parser.add_argument("--dev_index", type=int, default=None)
     parser.add_argument("--sample_questions", action="store_true")
-    parser.add_argument("--declarative", action="store_true")
-    parser.add_argument("--prompt_search", action="store_true")
-    parser.add_argument("--aux_few_shot", action="store_true")
-    parser.add_argument("--only_question", action="store_true")
-    parser.add_argument("--only_answer", action="store_true")
-    parser.add_argument("--skip_answer", action="store_true")
-    parser.add_argument("--skip_choices", action="store_true")
     parser.add_argument("--random_order", action="store_true")
+    parser.add_argument("--few_shot_topics", action="store_true")
+    parser.add_argument("--prompt_mmlu", action="store_true")
     args = parser.parse_args()
     return args
 
@@ -205,25 +208,26 @@ def lambda_fn(module: torch.nn.Module):
 def main():
     args = parse_args()
 
+    os.environ["ACCELERATE_MIXED_PRECISION"] = "bf16"
+    fsdp_plugin = None
     if WORLD_SIZE > 1:
         os.environ["ACCELERATE_USE_FSDP"] = "true"
-        os.environ["ACCELERATE_MIXED_PRECISION"] = "bf16"
 
-    auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
+        auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
 
-    fsdp_plugin = FullyShardedDataParallelPlugin(
-        sharding_strategy=ShardingStrategy.FULL_SHARD,
-        backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
-        auto_wrap_policy=auto_wrap_policy,
-        cpu_offload=False,
-        ignored_modules=None,
-        limit_all_gathers=True,
-        use_orig_params=True,
-        param_init_fn=None,
-        sync_module_states=True,
-        forward_prefetch=False,
-        activation_checkpointing=False,
-    )
+        fsdp_plugin = FullyShardedDataParallelPlugin(
+            sharding_strategy=ShardingStrategy.FULL_SHARD,
+            backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
+            auto_wrap_policy=auto_wrap_policy,
+            cpu_offload=False,
+            ignored_modules=None,
+            limit_all_gathers=True,
+            use_orig_params=True,
+            param_init_fn=None,
+            sync_module_states=True,
+            forward_prefetch=False,
+            activation_checkpointing=False,
+        )
 
     accelerator = Accelerator(fsdp_plugin=fsdp_plugin)
 
@@ -272,12 +276,11 @@ def main():
         accelerator.print("loading pretrained peft models")
         if args.ckpt_epoch is not None:
             ckpt = f"epoch_{args.ckpt_epoch}"
-            finetune_details = f"{model_name}/{args.finetuned_mode}/{args.finetuned_epochs}epochs/{ckpt}"
+            finetune_details = f"{model_name}/{args.dataset_name}/{args.finetuned_mode}/{args.finetuned_epochs}epochs/{ckpt}"
         elif args.step is not None:
             assert args.split == "dev+validation"
-
             ckpt = f"10ckpts/step_{args.step}"
-            finetune_details = f"{model_name}/{args.finetuned_mode}/{args.finetuned_epochs}epochs/{ckpt}"
+            finetune_details = f"{model_name}/{args.dataset_name}/{args.finetuned_mode}/{args.finetuned_epochs}epochs/{ckpt}"
         path = f"{args.finetuned_path}/{finetune_details}"
         model = PeftModel.from_pretrained(model, path)
         model.print_trainable_parameters()
@@ -299,17 +302,57 @@ def main():
     accelerator.print("model loaded. \n\n")
     sys.stdout.flush()
 
-    dataset, longest_seq = mmlu_dataset(
-        tokenizer=tokenizer,
-        max_seq_len=max_seq_len,
-        num_few_shots=args.num_few_shots,
-        accelerator=accelerator,
-        subject=None,
-        num_processes=args.preprocessing_num_workers,
-        split=args.split,
-        aux_few_shot=args.aux_few_shot,
-        random_order=args.random_order,
-    ).construct_dataset()
+    if args.dataset_name == "mmlu":
+        dataset_class = mmlu_dataset(
+            tokenizer=tokenizer,
+            max_seq_len=max_seq_len,
+            accelerator=accelerator,
+            num_few_shots=args.num_few_shots,
+            num_processes=args.preprocessing_num_workers,
+            split=args.split,
+        )
+
+    elif args.dataset_name == "scienceqa":
+        accelerator.print("dataset: scienceqa")
+        accelerator.print(f"num_few_shots: {args.num_few_shots}")
+        if args.few_shot_topics:
+            accelerator.print("subjects = topics")
+        else:
+            accelerator.print("subjects = category")
+        if args.prompt_mmlu:
+            accelerator.print("mmlu prompt")
+
+        dataset_class = scienceqa_dataset(
+            dataset_path=args.dataset_path,
+            tokenizer=tokenizer,
+            max_seq_len=max_seq_len,
+            num_few_shots=args.num_few_shots,
+            accelerator=accelerator,
+            num_processes=args.preprocessing_num_workers,
+            split=args.split,
+            prompt_mmlu=args.prompt_mmlu,
+            few_shot_topics=args.few_shot_topics,
+        )
+    elif args.dataset_name == "mmlu_pro_race":
+        subject = ["biology", "business"]
+        if args.dev_index is not None:
+            print("few_shot_index", args.dev_index)
+        dataset_class = mmlu_pro_race(
+            dataset_path=args.dataset_path,
+            tokenizer=tokenizer,
+            max_seq_len=max_seq_len,
+            num_few_shots=args.num_few_shots,
+            accelerator=accelerator,
+            num_processes=args.preprocessing_num_workers,
+            split=args.split,
+            subject=subject,
+            dev_index=args.dev_index,
+            seed=args.seed,
+            random_order=args.random_order,
+            sample_questions=args.sample_questions,
+        )
+
+    dataset, longest_seq = dataset_class.construct_dataset()
 
     accelerator.print("num few shots:", args.num_few_shots)
     accelerator.print("max_seq_len:", len(longest_seq["input_ids"][0]))
@@ -318,7 +361,6 @@ def main():
         dataset,
         args.micro_batch_size,
         pad_token_id,
-        max_seq_len=max_seq_len,
         world_size=WORLD_SIZE,
         shuffle=False,
         num_processes=args.preprocessing_num_workers,
@@ -336,7 +378,7 @@ def main():
     accelerator.print("testing longest seq fints into memory..")
     sys.stdout.flush()
     is_memory_enough(
-        model, longest_seq, args.micro_batch_size, pad_token_id, max_seq_len, WORLD_SIZE
+        model, longest_seq, args.micro_batch_size, pad_token_id, WORLD_SIZE
     )
     print_memory_consumed(accelerator.process_index)
     sys.stdout.flush()
@@ -353,9 +395,22 @@ def main():
     nsamples = len(dataloader.dataset)
     accelerator.print("num_total_samples", nsamples)
 
-    inner_path = (
-        f"evaluated_{args.split}/random_order/{model_name}/{args.num_few_shots}shot"
-    )
+    inner_path = f"{args.dataset_name}"
+    if args.dataset_name == "scienceqa":
+        # some opttions for the scienceqa dataset are save in different categories
+        if args.few_shot_topics:
+            inner_path += "/few_shot_topics/"
+        else:
+            inner_path += "/few_shot_category/"
+        if args.prompt_mmlu:
+            inner_path += "/prompt_mmlu/"
+
+    if args.sample_questions:
+        inner_path += f"/evaluated_{args.split}/sampled/{model_name}/{args.seed}/{args.num_few_shots}shot"
+    elif args.random_order:
+        inner_path += f"evaluated_{args.split}/shuffled/{model_name}/{args.seed}/{args.num_few_shots}shot"
+    else:
+        inner_path += f"/evaluated_{args.split}/{model_name}/{args.num_few_shots}shot"
 
     if args.finetuned_path:
         inner_path = f"finetuned_{args.finetuned_mode}/evaluated_{args.split}/{model_name}/{args.finetuned_epochs}epochs/{ckpt}"
@@ -370,7 +425,6 @@ def main():
         maxk=args.maxk,
         dirpath=dirpath,
         filename=args.out_filename,
-        use_last_token=args.use_last_token,
         remove_duplicates=args.remove_duplicates,
         save_distances=args.save_distances,
         save_repr=args.save_repr,

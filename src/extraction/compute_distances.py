@@ -3,12 +3,12 @@ import time
 import torch
 import numpy as np
 from torch.utils.data import DataLoader
-from intrinsic_dimension.pairwise_distances import compute_distances
-from intrinsic_dimension.extract_activations import extract_activations
+from extraction.pairwise_distances import compute_distances
+from extraction.extract_activations import extract_activations
 from transformers import PreTrainedModel
 from accelerate import Accelerator
 import pickle
-from intrinsic_dimension.helpers import (
+from extraction.helpers import (
     get_embdims,
     measure_performance,
     remove_duplicates_func,
@@ -102,7 +102,7 @@ def estract_representations(
 
                     start = time.time()
                     distances, dist_index, mus, _ = compute_distances(
-                        X=act,
+                        x=act,
                         n_neighbors=maxk + 1,
                         n_jobs=1,
                         working_memory=2048,

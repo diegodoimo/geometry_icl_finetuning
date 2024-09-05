@@ -16,13 +16,13 @@ def get_target_layers(
 
     prefix = "module."
     middle = ""
-    # accelerate does not cast to bf16 a DDP model yet
-    if world_size > 0:
+    # ?? accelerate does not cast to bf16 a DDP model yet
+    if world_size > 1:
         prefix = "_fsdp_wrapped_module."
         if map_names[option] != "":
             middle = "._fsdp_wrapped_module"
     if finetuned:
-        prefix += "base_model.model."
+        prefix = "base_model.model."
 
     target_layers = {
         i: f"{prefix}model.layers.{i}{middle}{suffix}" for i in range(0, n_layer, every)
@@ -60,11 +60,9 @@ def is_memory_enough(model, longest_seq, micro_batch_size, pad_token_id, world_s
         num_processes=4,
     )
 
-    for i, data in enumerate(longest_loader):
-
-        for val in data.values():
-            val = val.to("cuda")
-
-        _ = model(input_ids=data["input_ids"])
+    for i, batch in enumerate(longest_loader):
+        if world_size == 1:
+            batch = {key: val.to("cuda") for key, val in batch.items()}
+        _ = model(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"])
 
     torch.cuda.empty_cache()

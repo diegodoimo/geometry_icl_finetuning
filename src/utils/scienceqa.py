@@ -1,4 +1,4 @@
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 import torch
 from functools import partial
 from datasets.utils.logging import disable_progress_bar
@@ -9,7 +9,6 @@ from collections import Counter
 
 rng = np.random.default_rng(42)
 disable_progress_bar()
-
 IGNORE_INDEX = -100
 
 
@@ -38,11 +37,12 @@ def format_subject(subject):
 
 
 # prompt builder
-class mmlu_dataset:
+class scienceqa_dataset:
     # num_few_shots = # shots
     # model_name number_istances to remove
     def __init__(
         self,
+        dataset_path,
         tokenizer,
         max_seq_len,
         accelerator,
@@ -52,10 +52,12 @@ class mmlu_dataset:
         split="test",
         mask_path=None,
         samples_per_subject=None,
-        dataset_path=None,
+        prompt_mmlu=False,
+        few_shot_topics=False,
     ):
 
-        self.dataset = "mmlu"
+        self.dataset = "scienceqa"
+        self.dataset_path = dataset_path
         self.answers = np.array(["A", "B", "C", "D"])
         self.num_few_shots = num_few_shots
         self.tokenizer = tokenizer
@@ -66,9 +68,32 @@ class mmlu_dataset:
         self.split = split
         self.mask_path = mask_path
         self.samples_per_subject = samples_per_subject
+        self.prompt_mmlu = prompt_mmlu
+        self.few_shot_indices = None
+        self.acc_macro = None
+        self.few_shot_topics = few_shot_topics
 
     # ****************************************************
-    def construct_question(self, question, choices, answer, include_answer=False):
+    def construct_question_scienceqa(
+        self, question, choices, answer, context=None, include_answer=False
+    ):
+        # added strip
+        prompt = f"Question: {question.strip()}\n"
+        if context is not None and len(context) > 0:
+            prompt += f"Context: {context.strip()}\n"
+        prompt += "Options:\n"
+        for i, choice in enumerate(choices):
+            # added strip
+            prompt += f"{self.answers[i]}. {choice.strip()}\n"
+        # added space to final answers
+        prompt += "Answer:"
+        if include_answer:
+            prompt += f" {self.answers[answer]}\n\n"
+        return prompt
+
+    def construct_question(
+        self, question, choices, answer, context=None, include_answer=False
+    ):
         # added strip
         prompt = f"{question.strip()}\n"
         for i, choice in enumerate(choices):
@@ -82,20 +107,20 @@ class mmlu_dataset:
 
     # *********************************************************
 
-    ############
-
-    #  THIS IS THE FUNCTION FOR CONSTRUCTION FEW-SHOT PROMPTS
-
-    ############
-
     # prompt contruction.buils to operate on list of inputs.
-    def construct_prompt(self, batch, tokenizer, dev_set, max_seq_len, num_few_shots):
+    def construct_prompt(
+        self, batch, tokenizer, dev_set, max_seq_len, num_few_shots, question_func
+    ):
 
         prompts = []
+        subject_field = "category"
+        if self.few_shot_topics:
+            subject_field = "topic"
 
         questions = batch["question"]  # list of strings
-        subjects = batch["subject"]  # list of strings
+        subjects = batch[subject_field]  # list of strings
         choices = batch["choices"]  # list of list of strings
+        context = batch["hint"]
         answer_indices = np.array(batch["answer"])  # array of integers
 
         # build a dict of subsets of the dev set with the subject of the batch
@@ -103,7 +128,7 @@ class mmlu_dataset:
             local_dev_set = {}
             for subject in set(subjects):
                 local_dev_set[subject] = dev_set.filter(
-                    lambda dev_example, current=subject: dev_example["subject"]
+                    lambda dev_example, current=subject: dev_example[subject_field]
                     == current
                 )
 
@@ -112,14 +137,15 @@ class mmlu_dataset:
             current_subject = subjects[i]
             for j in range(num_few_shots):
                 shot = local_dev_set[current_subject][j]
-                prompt += self.construct_question(
+                prompt += question_func(
                     shot["question"],
                     shot["choices"],
                     shot["answer"],
+                    shot["hint"],
                     include_answer=True,
                 )
-            question = self.construct_question(
-                questions[i], choices[i], answer_indices[i]
+            question = question_func(
+                questions[i], choices[i], answer_indices[i], context[i]
             )
             prompt += question
             prompts.append(prompt)
@@ -158,7 +184,13 @@ class mmlu_dataset:
         }
 
     def construct_prompt_train(
-        self, batch, tokenizer, dev_set, max_seq_len, num_few_shots=None
+        self,
+        batch,
+        tokenizer,
+        dev_set,
+        max_seq_len,
+        num_few_shots=None,
+        question_func=None,
     ):
         # dev_set and few_shots are not used here
         prompts = []
@@ -170,7 +202,7 @@ class mmlu_dataset:
         answer_indices = np.array(batch["answer"])  # array of integers
 
         for i in range(len(questions)):
-            question = self.construct_question(
+            question = question_func(
                 questions[i],
                 choices[i],
                 answer_indices[i],
@@ -257,34 +289,30 @@ class mmlu_dataset:
             final = dataset.select(mask)
         return final
 
-    #####################
-
-    # MAIN FUNCTION BELOW
-
-    #####################
-
     def construct_dataset(self):
         """
         Construct the request instances for the scenario
         """
-        split = self.split
+
+        subfolder_name = "category_partition"
+        if self.few_shot_topics:
+            self.accelerator.print("using the topic partition as subjects")
+            subfolder_name = "topic_partition"
+
         if self.split == "train":
-            # training on the dev + validation datasets
-            split = "dev+validation"
             assert self.num_few_shots == 0
-            dataset = self.construct_balanced(
-                mask_path=self.mask_path,
-                samples_per_subject=self.samples_per_subject,
-                split=split,
-            )
+            dataset = load_from_disk(f"{self.dataset_path}/{subfolder_name}/train")
+
         else:
-            dataset = load_dataset("cais/mmlu", "all", split=split)
+            dataset = load_from_disk(f"{self.dataset_path}/{subfolder_name}/test")
 
         few_shot_dataset = None
         if self.num_few_shots > 0:
             if self.num_few_shots > 5:
                 assert False
-            few_shot_dataset = load_dataset("cais/mmlu", "all", split="dev")
+            few_shot_dataset = load_from_disk(
+                f"{self.dataset_path}/{subfolder_name}/train"
+            )
 
         # *********************************************************************************
         # contruct prompt and tokenize
@@ -292,12 +320,18 @@ class mmlu_dataset:
         if self.split == "train":
             prompt_func = self.construct_prompt_train
 
+        if self.prompt_mmlu:
+            question = self.construct_question
+        else:
+            question = self.construct_question_scienceqa
+
         encode_function = partial(
             prompt_func,
             tokenizer=self.tokenizer,
             dev_set=few_shot_dataset,
             max_seq_len=self.max_seq_len,
             num_few_shots=self.num_few_shots,
+            question_func=question,
         )
         self.accelerator.print("tokenization started")
         sys.stdout.flush()

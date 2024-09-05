@@ -34,6 +34,7 @@ def get_scheduler(optimizer, args):
         warmup_steps = 0
     elif args.warmup_steps is None:
         warmup_steps = int(args.warmup_ratio * args.max_train_steps)
+    warmup_steps = int(min(warmup_steps, 3))
 
     scheduler_func = lambda x: min(
         args.lr_min_fact + (1 - args.lr_min_fact) * min(x, warmup_steps) / warmup_steps,
