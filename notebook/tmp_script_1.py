@@ -104,7 +104,7 @@ def retrieve_from_storage(
         # indices = sample_indices(labels["subjects"], instances_per_sub)
         # np.save("test_mask_200.npy", indices)
         # indices = np.load("/u/dssc/zenocosini/helm_suite/representation_landscape_fs_ft/test_mask_200.npy")
-        indices = np.load("/u/dssc/zenocosini/helm_suite/representation_landscape_fs_ft/test_mask_200_diego.npy")
+        indices = np.load("/u/dssc/zenocosini/helm_suite/representation_landscape_fs_ft/assets/test_mask_200.npy")
         hidden_states = hidden_states[indices]
         labels["subjects"] = labels["subjects"][indices]
         labels["predictions"] = labels["predictions"][indices]
@@ -139,6 +139,10 @@ _PATH_ft = Path("/orfeo/cephfs/scratch/area/ddoimo/open"\
                 "/geometric_lens/repo/results"\
                 "/finetuned_dev_val_balanced_20samples"\
                 "/evaluated_test/llama-3-8b/4epochs/epoch_4")
+
+model_name = "llama-3-70b"
+_PATH = Path(f"/orfeo/cephfs/scratch/area/ddoimo/open/geometric_lens"
+            f"/repo/results/evaluated_test/random_order/{model_name}/4shot")
 # results = []
 # for layer in range(80):
 #     out_from_storage = retrieve_from_storage(_PATH_ft,
@@ -156,8 +160,8 @@ _PATH_ft = Path("/orfeo/cephfs/scratch/area/ddoimo/open"\
 # # save the plot
 # plt.savefig("ari_plot.png")
 
-layer = 30
-out_from_storage = retrieve_from_storage(_PATH_ft,
+layer = 58
+out_from_storage = retrieve_from_storage(_PATH,
                                             instances_per_sub=200,
                                             layer=layer,
                                             )

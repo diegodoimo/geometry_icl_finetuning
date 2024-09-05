@@ -144,14 +144,19 @@ def retrieve_from_storage(
 
     path_stat_target = Path(storage_path, "statistics_target.pkl")
     if not path_stat_target.exists():
-        with open(Path(storage_path, "statistics_target_sorted_sample42.pkl"), "rb") as f:
-            stat_target = pickle.load(f)    
+        path_stat_target_42 = Path(storage_path, "statistics_target_sorted_sample42.pkl")
+        if path_stat_target_42.exists():
+            with open(Path(storage_path, "statistics_target_sorted_sample42.pkl"), "rb") as f:
+                stat_target = pickle.load(f)    
+        else:
+            with open(Path(storage_path, "statistics_target_sorted_sample42.pklls"), "rb") as f:
+                stat_target = pickle.load(f)    
     else:
         with open(path_stat_target, "rb") as f:
             stat_target = pickle.load(f)
 
     labels = {"subjects": stat_target["subjects"],
-              "predictions": stat_target["contrained_predictions"]}
+              "predictions": stat_target["answers"]}
     
     files = os.listdir(storage_path)
     if full_tensor:
@@ -170,7 +175,7 @@ def retrieve_from_storage(
         labels["predictions"] = labels["predictions"][:min_instances]
         hidden_states = hidden_states[:min_instances]
         if instances_per_sub != -1:
-            indices = sample_indices(labels["subjects"][0], instances_per_sub)
+            indices = np.load("/u/dssc/zenocosini/helm_suite/representation_landscape_fs_ft/assets/test_mask_200.npy")
             hidden_states = hidden_states[:, indices]
             labels["subjects"] = labels["subjects"][:, indices]
             labels["predictions"] = labels["predictions"][:, indices]
