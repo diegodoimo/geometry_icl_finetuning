@@ -433,6 +433,11 @@ def main():
 
 
 if __name__ == "__main__":
-    WORLD_SIZE = int(os.environ["WORLD_SIZE"])
-    RANK = int(os.environ["RANK"])
+    
+    if 'SLURM_JOB_ID' in os.environ:
+        WORLD_SIZE = int(os.environ["WORLD_SIZE"])
+        RANK = int(os.environ["RANK"])
+    else:
+        WORLD_SIZE = 1
+        RANK = 0
     main()
