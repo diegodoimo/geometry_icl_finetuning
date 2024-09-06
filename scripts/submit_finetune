@@ -10,7 +10,7 @@
 #SBATCH --job-name=test
 #SBATCH --gres=gpu:1 #it is intended per node
 
-source /u/area/ddoimo/anaconda3/bin/activate ./env_emd
+poetry shell
 
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True" 
