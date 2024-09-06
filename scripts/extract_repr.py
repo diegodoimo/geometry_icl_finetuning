@@ -3,23 +3,26 @@
 import argparse
 import logging
 import os
+import sys
+import pathlib
+sys.path.append(str(pathlib.Path(__file__).parent.parent))
 import datasets
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 
 import transformers
 import sys
-from utils.helpers_extract import get_target_layers
-from utils.model_utils import get_model
-from utils.dataloader_utils import get_dataloader
-from utils.dataset_utils import mmlu_dataset
-from utils.scienceqa import scienceqa_dataset
-from utils.mmlu_pro_race import mmlu_pro_race
-from utils.tokenizer_utils import get_tokenizer
-from extraction.compute_distances import estract_representations
+from src.utils.helpers_extract import get_target_layers
+from src.utils.model_utils import get_model
+from src.utils.dataloader_utils import get_dataloader
+from src.utils.dataset_utils import mmlu_dataset
+from src.utils.scienceqa import scienceqa_dataset
+from src.utils.mmlu_pro_race import mmlu_pro_race
+from src.utils.tokenizer_utils import get_tokenizer
+from src.extraction.compute_distances import estract_representations
 import torch
 import os
-from utils.helpers_extract import print_memory_consumed, is_memory_enough
+from src.utils.helpers_extract import print_memory_consumed, is_memory_enough
 
 from functools import partial
 from accelerate import FullyShardedDataParallelPlugin
@@ -435,8 +438,10 @@ def main():
 if __name__ == "__main__":
     
     if 'SLURM_JOB_ID' in os.environ:
-        WORLD_SIZE = int(os.environ["WORLD_SIZE"])
-        RANK = int(os.environ["RANK"])
+        # WORLD_SIZE = int(os.environ["WORLD_SIZE"])
+        # RANK = int(os.environ["RANK"])
+        WORLD_SIZE = 1
+        RANK = 0
     else:
         WORLD_SIZE = 1
         RANK = 0

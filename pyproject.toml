@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "representation_landscape_fs_ft"
+name = "geometry_icl_finetuning"
 version = "0.1.0"
 description = "The Representation Landscape of few-shot learning and fine-tuning in Large Language Models"
 authors = ["https://github.com/alexserra98","https://github.com/diegodoimo"]
@@ -18,10 +18,10 @@ sentencepiece = "^0.2.0"
 peft = "^0.12.0"
 jaxtyping = "^0.2.33"
 seaborn = "^0.13.2"
-matplotlib = "^3.9.1"
 einops = "^0.8.0"
 jupyterlab = "^4.2.4"
 datasets = "^2.20.0"
+
 
 
 

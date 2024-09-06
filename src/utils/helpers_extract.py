@@ -25,14 +25,21 @@ def get_target_layers(
         prefix = "base_model.model."
 
     target_layers = {
-        i: f"{prefix}model.layers.{i}{middle}{suffix}" for i in range(0, n_layer, every)
+        i: f"{prefix}model.layers.{i}{middle}{suffix}" 
+        for i in range(0, n_layer, every)
     }
 
     target_layers[n_layer] = f"{prefix}model.norm"
     target_layers[n_layer + 1] = f"{prefix}lm_head"
-
+    
+    if target_layers[n_layer] not in names:
+        target_layers = {
+            i: f"model.layers.{i}{middle}{suffix}"
+            for i in range(0, n_layer, every)
+        }
+    
     for target_layer in target_layers.values():
-        assert target_layer in names, (target_layer, names)
+        assert target_layer in names, f"{target_layer} not found in model"
 
     return target_layers
 

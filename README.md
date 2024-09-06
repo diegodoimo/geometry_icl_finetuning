@@ -48,6 +48,11 @@ To set up the environment and install the necessary dependencies, we use `poetry
     ```
     poetry install
     ```
+3. Activate the environment with:
+    
+    ```
+    poetry shell
+    ```
 
 This will create a virtual environment and install all necessary packages specified in the `pyproject.toml` file.
 
@@ -58,7 +63,7 @@ This will create a virtual environment and install all necessary packages specif
 To extract the intermediate representations from a transformer model, run the following script. This script generates representations for each layer of the model based on the specified configuration.
 
 ```
-python scripts/extract_repr.py --checkpoint_dir "/path/where/to/save/the/representations" \
+python scripts/extract_repr.py --checkpoint_dir "/path/to/hf/model" \
                                 --use_slow_tokenizer \
                                 --preprocessing_num_workers 16 \
                                 --micro_batch_size 1 \
@@ -76,7 +81,7 @@ python scripts/extract_repr.py --checkpoint_dir "/path/where/to/save/the/represe
 
 #### Important Arguments
 
-- `--checkpoint_dir`: Directory to save the extracted representations.
+- `--checkpoint_dir`: Name or path of the directory of the Hugging Face model.
 - `--dataset_name`: Name of the dataset to use.
 - `--dataset_path`: Path to the dataset.
 

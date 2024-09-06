@@ -5,6 +5,9 @@ import argparse
 import logging
 import math
 import os
+import sys
+import pathlib
+sys.path.append(str(pathlib.Path(__file__).parent.parent))
 import datasets
 import warnings
 import torch
@@ -33,20 +36,20 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
 
 # *******************************************************************
 
-from utils.dataloader_utils import get_dataloader, DataCollatorForCausalLMEval
-from utils.helpers_finetune import (
+from src.utils.dataloader_utils import get_dataloader, DataCollatorForCausalLMEval
+from src.utils.helpers_finetune import (
     print_memory_consumed,
     save_with_accelerate,
     find_grad_accumulation_steps,
     compute_weighted_ce,
     save_statistics,
 )
-from utils.dataset_utils import mmlu_dataset
-from utils.mmlu_pro_race import mmlu_pro_race
-from utils.dataloader_utils import get_dataloader
-from utils.tokenizer_utils import get_tokenizer
-from utils.optimizer_utils import get_optimizer, get_scheduler
-from utils.model_utils import get_model
+from src.utils.dataset_utils import mmlu_dataset
+from src.utils.mmlu_pro_race import mmlu_pro_race
+from src.utils.dataloader_utils import get_dataloader
+from src.utils.tokenizer_utils import get_tokenizer
+from src.utils.optimizer_utils import get_optimizer, get_scheduler
+from src.utils.model_utils import get_model
 
 
 # *******************************************************************
@@ -860,8 +863,10 @@ def get_cpt_steps(nsteps, max_train_steps, logspace=True):
 
 if __name__ == "__main__":
     if 'SLURM_JOB_ID' in os.environ:
-        WORLD_SIZE = int(os.environ["WORLD_SIZE"])
-        RANK = int(os.environ["RANK"])
+        # WORLD_SIZE = int(os.environ["WORLD_SIZE"])
+        # RANK = int(os.environ["RANK"])
+        WORLD_SIZE = 1
+        RANK = 0
     else:
         WORLD_SIZE = 1
         RANK = 0
