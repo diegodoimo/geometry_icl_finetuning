@@ -63,20 +63,20 @@ This will create a virtual environment and install all necessary packages specif
 To extract the intermediate representations from a transformer model, run the following script. This script generates representations for each layer of the model based on the specified configuration.
 
 ```
-python scripts/extract_repr.py --checkpoint_dir "/path/to/hf/model" or name_of_the_hf_repo
-                                --use_slow_tokenizer 
-                                --preprocessing_num_workers 16
-                                --micro_batch_size 1
-                                --out_dir "./results"
-                                --logging_steps 100
-                                --layer_interval 1
-                                --remove_duplicates
-                                --use_last_token
-                                --max_seq_len 4090
-                                --split "test"
-                                --num_few_shots 5
-                                --dataset_name "name_of_the_dataset"
-                                --dataset_path "/path/to/the/dataset"
+poetry run python scripts/extract_repr.py --checkpoint_dir "/path/to/hf/model" or name_of_the_hf_repo
+                                          --use_slow_tokenizer 
+                                          --preprocessing_num_workers 16
+                                          --micro_batch_size 1
+                                          --out_dir "./results"
+                                          --logging_steps 100
+                                          --layer_interval 1
+                                          --remove_duplicates
+                                          --use_last_token
+                                          --max_seq_len 4090
+                                          --split "test"
+                                          --num_few_shots 5
+                                          --dataset_name "name_of_the_dataset"
+                                          --dataset_path "/path/to/the/dataset"
 ```
 
 #### Important Arguments
@@ -90,35 +90,35 @@ python scripts/extract_repr.py --checkpoint_dir "/path/to/hf/model" or name_of_t
 Fine-tune a transformer model using your custom dataset by running:
 
 ```
-python scripts/finetune.py --dataset_name name_of_the_dataset
-                            --dataset_path /path/to/the/dataset
-                            --mask_path /path/to/the/dataset
-                            --samples_per_subject 50
-                            --model_name_or_path /your/path/to/hf/model
-                            --tokenizer_name /your/path/to/hf/model
-                            --use_lora
-                            --lora_rank 64
-                            --lora_alpha 16
-                            --lora_dropout 0.1
-                            --use_slow_tokenizer
-                            --low_cpu_mem_usage
-                            --max_seq_length 1024
-                            --batch_size 16
-                            --preprocessing_num_workers 16
-                            --per_device_train_batch_size 1
-                            --per_device_eval_batch_size 1
-                            --learning_rate 1e-4
-                            --warmup_ratio 0.05
-                            --weight_decay 0.0
-                            --num_train_epochs 1
-                            --output_dir /your/path/to/store/the/result/
-                            --out_filename ""
-                            --checkpointing_steps 10
-                            --logging_steps 20
-                            --eval_steps 4
-                            --weight_samples
-                            --use_flash_attn
-                            --measure_baselines
+poetry run python scripts/finetune.py --dataset_name name_of_the_dataset
+                                      --dataset_path /path/to/the/dataset
+                                      --mask_path /path/to/the/dataset
+                                      --samples_per_subject 50
+                                      --model_name_or_path /your/path/to/hf/model
+                                      --tokenizer_name /your/path/to/hf/model
+                                      --use_lora
+                                      --lora_rank 64
+                                      --lora_alpha 16
+                                      --lora_dropout 0.1
+                                      --use_slow_tokenizer
+                                      --low_cpu_mem_usage
+                                      --max_seq_length 1024
+                                      --batch_size 16
+                                      --preprocessing_num_workers 16
+                                      --per_device_train_batch_size 1
+                                      --per_device_eval_batch_size 1
+                                      --learning_rate 1e-4
+                                      --warmup_ratio 0.05
+                                      --weight_decay 0.0
+                                      --num_train_epochs 1
+                                      --output_dir /your/path/to/store/the/result/
+                                      --out_filename ""
+                                      --checkpointing_steps 10
+                                      --logging_steps 20
+                                      --eval_steps 4
+                                      --weight_samples
+                                      --use_flash_attn
+                                      --measure_baselines
 ```
 
 #### Important Arguments
