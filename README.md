@@ -63,7 +63,7 @@ This will create a virtual environment and install all necessary packages specif
 To extract the intermediate representations from a transformer model, run the following script. This script generates representations for each layer of the model based on the specified configuration.
 
 ```
-python scripts/extract_repr.py --checkpoint_dir "/path/to/hf/model"
+python scripts/extract_repr.py --checkpoint_dir "/path/to/hf/model" or name_of_the_hf_repo
                                 --use_slow_tokenizer 
                                 --preprocessing_num_workers 16
                                 --micro_batch_size 1
@@ -90,9 +90,9 @@ python scripts/extract_repr.py --checkpoint_dir "/path/to/hf/model"
 Fine-tune a transformer model using your custom dataset by running:
 
 ```
-python scripts/finetune.py --dataset_name $dataset_name
-                            --dataset_path $dataset_path
-                            --mask_path $dataset_path
+python scripts/finetune.py --dataset_name name_of_the_dataset
+                            --dataset_path /path/to/the/dataset
+                            --mask_path /path/to/the/dataset
                             --samples_per_subject 50
                             --model_name_or_path /your/path/to/hf/model
                             --tokenizer_name /your/path/to/hf/model
@@ -152,18 +152,23 @@ Make sure to adjust the SLURM parameters in the `submit_extract` script accordin
 ## 📁 Project Structure
 
 ```
-yourproject/
-├── scripts/
-│   ├── extract_repr.py          # Script to extract model representations
-│   ├── finetune.py              # Script to fine-tune the model
-│   └── submit_extract           # SLURM submission script for extraction
-├── notebook/
-│   └── plot.py                  # Jupyter notebook for plotting results and computing metrics
-├── results/                     # Directory to store results
-├── data/                        # Directory for datasets
-├── README.md                    # Project readme file
-├── pyproject.toml               # Poetry environment configuration
-└── ...
+geometry_icl_finetuning/
+├── README.md                      # Project documentation
+├── __init__.py                    # Marks the directory as a Python package
+├── assets/                        # Directory for storing assets (e.g., figures, model weights)
+├── notebook/                      # Contains notebooks for running experiments with specific datasets
+│   └── experiment_notebook.ipynb  # Example notebook for experiments
+├── scripts/                       # Scripts to automate tasks like extraction and finetuning
+│   ├── extract_repr.py            # Extracts intermediate representations from a dataset
+│   ├── finetune.py                # Finetunes a model on a given dataset
+│   ├── submit_extract             # SLURM job script for launching `extract_repr.py`
+│   └── submit_finetune            # SLURM job script for launching `finetune.py`
+├── src/                           # Source code for the project
+│   ├── extraction/                # Code related to feature/representation extraction
+│   ├── logger/                    # Logging utilities
+│   ├── metrics/                   # Metrics and evaluation routines for experiments
+│   └── utils/                     # Utility functions for various tasks
+└── tests/                         # Unit and integration tests for the project
 ```
 
 ## Contributing
