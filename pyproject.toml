@@ -10,7 +10,7 @@ package-mode = false
 python = "^3.11"
 dadapy = {git = "https://github.com/sissa-data-science/DADApy"}
 numpy = "1.26.4"
-torch = "^2.4.0"
+torch = {version = "2.3.1+cu118", source = "torch118"}
 tokenizers = "^0.19.1"
 accelerate = "^0.33.0"
 transformers = "^4.43.3"
@@ -21,8 +21,12 @@ seaborn = "^0.13.2"
 einops = "^0.8.0"
 jupyterlab = "^4.2.4"
 datasets = "^2.20.0"
+flash_attn = "2.6.2"
 
-
+[[tool.poetry.source]]
+name = "torch118"
+url = "https://download.pytorch.org/whl/cu118"
+priority = "explicit"
 
 
 [build-system]

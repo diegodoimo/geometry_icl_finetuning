@@ -1,6 +1,5 @@
 from src.utils.annotations import Array, _N_JOBS
 from src.utils.error import MetricComputationError, DataRetrievalError
-from src.utils.tensor_storage import retrieve_from_storage
 import logging
 from dadapy.data import Data
 from sklearn.metrics import mutual_info_score
@@ -274,4 +273,200 @@ class LabelClustering():
                                                 "entropy_values", 
                                                 "fraction_most_represented"])
         return df_out
+
+
+class PointClustering():
+    def __init__(self):
+        pass
+    def main(self,
+             z: Float,
+             input_i: Float[Array, "num_layers num_instances d_model"] |
+                Tuple[Float[Array, "num_layers num_instances nearest_neigh"]],
+             input_j: Float[Array, "num_layers num_instances d_model"] |
+                Tuple[Float[Array, "num_layers num_instances nearest_neigh"]],
+             labels: Int[Array, "num_layers num_instances"],
+             number_of_layers: Int,
+             halo: Bool = False,
+             parallel: Bool = True
+             ) -> Dict[str, Float[Array, "num_layers num_layers"]]:
         
+        module_logger = logging.getLogger(__name__)
+        module_logger.info(f"Computing point cluster")
+        # import pdb; pdb.set_trace()
+        try:
+            
+            output_dict = self.parallel_compute(
+                number_of_layers, input_i, input_j, labels, z, halo, parallel
+            )
+        except DataRetrievalError as e:
+            module_logger.error(
+                f"Error retrieving data: {e}"
+            )
+            raise
+        except MetricComputationError as e:
+            module_logger.error(
+                f"Error occured during computation of metrics: {e}"
+            )
+            raise
+        except Exception as e:
+            module_logger.error(
+                f"Error computing clustering: {e}"
+            )
+            raise e
+
+        return output_dict
+  
+    def parallel_compute(
+        self, 
+        number_of_layers: Int,
+        input_i: Float[Array, "num_layers num_instances d_model"] |
+        Tuple[Float[Array, "num_layers num_instances nearest_neigh"]],
+        input_j: Float[Array, "num_layers num_instances d_model"] |
+        Tuple[Float[Array, "num_layers num_instances nearest_neigh"]],
+        labels: Int[Array, "num_layers num_instances"],
+        z: Float,
+        halo: Bool = False,
+        parallel: Bool = True
+    ) -> Dict[str, Float[Array, "num_layers"]]:
+        """
+        Compute the overlap between two set of representations using Advanced Peak Clustering.
+        M.dErrico, E. Facco, A. Laio, A. Rodriguez, Automatic topography of
+        high-dimensional data sets by non-parametric density peak clustering,
+        Information Sciences 560 (2021) 476492.
+        Inputs:
+            input_i: Float[Array, "num_layers num_instances d_model"] |
+            Tuple[Float[Array, "num_layers num_instances nearest_neigh"]],
+            input_j: Float[Array, "num_layers num_instances d_model"] |
+            Tuple[Float[Array, "num_layers num_instances nearest_neigh"]],
+                It can either receive the hidden states or the distance matrices
+            labels: Float[Int, "num_instances"]
+            z: Array
+                merging parameter for the clustering algorithm
+            halo: bool
+                compute (or not) the halo points
+
+        Returns:
+            Dict[str, Float[Array, "num_layers"]]
+        """        
+        process_layer = partial(
+            self.process_layer,
+            input_i=input_i,
+            input_j=input_j,
+            z=z,
+            halo=halo
+        )
+        results = []
+       
+        if parallel:
+            # Parallelize the computation of the metric
+            # If the program crash try reducing the number of jobs
+            with Parallel(n_jobs=_N_JOBS) as parallel:
+                results = parallel(
+                    delayed(process_layer)(layer,
+                                           label=labels[layer])
+                    for layer in tqdm.tqdm(range(number_of_layers),
+                                           desc="Processing layers")
+                )
+        else:
+            for layer in tqdm.tqdm(range(number_of_layers)):
+                results.append(process_layer(layer,
+                                             label=labels[layer]))
+        
+        keys = list(results[0].keys())
+        output = {key: [] for key in keys}
+
+        # Merge the results
+        for layer_result in results:
+            for key in output:
+                output[key].append(layer_result[key])
+        return output
+
+
+    def process_layer(self, 
+                      layer: Int, 
+                      input_i: Float[Array, "num_instances num_layers model_dim"],
+                      input_j: Float[Array, "num_instances num_layers model_dim"],
+                      z: Array
+        ) -> Dict[str, Float[Array, "num_layers"]]:
+        """
+        Process a single layer.
+        Inputs:
+            layer: Int
+            input_i: Float[Array, "num_instances, num_layers, model_dim"]
+            input_j: Float[Array, "num_instances, num_layers, model_dim"]
+            z: Array
+                merging parameter for the clustering algorithm
+                M.dErrico, E. Facco, A. Laio, A. Rodriguez, Automatic
+                topography of high-dimensional data sets by
+                non-parametric density peak clustering, Information Sciences
+                560 (2021) 476492
+        Returns:
+            Dict[str, Float[Array, "num_layers"]]
+        """
+        data_i = input_i[:, layer, :]
+        data_j = input_j[:, layer, :]
+
+        if "norm" in self.variations["point_clustering"]:
+            data_i = data_i / np.linalg.norm(data_i, axis=1, keepdims=True)
+            clusters_i = self.compute_cluster_assignment(data_i, z)
+
+            data_j = data_j / np.linalg.norm(data_j, axis=1, keepdims=True)
+            clusters_j = self.compute_cluster_assignment(data_j, z)
+
+        else:
+            clusters_i = self.compute_cluster_assignment(data_i, z)
+            clusters_j = self.compute_cluster_assignment(data_j, z)
+        layer_results = {}
+
+        for key, func in _COMPARISON_METRICS.items():
+            layer_results[key] = func(clusters_i, clusters_j)
+
+        return layer_results
+
+    def compute_cluster_assignment(self, base_repr, z):
+        data = Data(coordinates=base_repr, maxk=100)
+        ids, _, _ = data.return_id_scaling_gride(range_max=100)
+        data.set_id(ids[3])
+        data.compute_density_kNN(k=16)
+        clusters_assignment = data.compute_clustering_ADP(Z=z)
+        return clusters_assignment
+
+
+def balance_by_label_within_groups(
+        df: pd.DataFrame, 
+        group_field: str, 
+        label_field: str):
+    """
+    Balance the number of elements for each value of `label_field` within each group defined by `group_field`.
+
+    Inputs
+        df : pd.DataFrame
+            The dataframe to balance.
+        group_field : str
+            The column name to group by.
+        label_field : str
+            The column name whose values need to be balanced within each group.
+
+    Returns
+        pd.DataFrame
+            A new dataframe where each group defined by `group_field` is 
+            balanced according to `label_field`.
+    """
+
+    # Function to balance each group
+    def balance_group(group):
+        # Count instances of each label within the group
+        class_counts = group[label_field].value_counts()
+        min_count = class_counts.min()  # Find the minimum count
+        # Sample each subset to have the same number of instances as the minimum count
+        return (
+            group.groupby(label_field)
+            .apply(lambda x: x.sample(min_count))
+            .reset_index(drop=True)
+        )
+
+    # Group the dataframe by `group_field` and apply the balancing function
+    balanced_df = df.groupby(group_field).apply(balance_group)
+    index = balanced_df.index
+    index = [r[1] for r in list(index)]
+    return balanced_df.reset_index(drop=True), index
