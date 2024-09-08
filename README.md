@@ -1,6 +1,6 @@
-# The representation landscape of few-shot learning and fintuning in large transformer models.
+## The Representation Landscape of Few-Shot Learning and Fine-Tuning in Large Language Models
 
-Source code of the paper:  The representation landscape of few-shot learning and fintuning in large transformer models. 
+Source code of the paper:  **The representation landscape of few-shot learning and fine-tuning in large language models** 
 
 
 ### Build an environment with the required dependencies
@@ -17,3 +17,5 @@ pip install -r requirements.txt
 ```
 sbatch submit_extract
 ```
+
+### More to come ...
