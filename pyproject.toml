@@ -21,7 +21,6 @@ seaborn = "^0.13.2"
 einops = "^0.8.0"
 jupyterlab = "^4.2.4"
 datasets = "^2.20.0"
-flash_attn = "2.6.2"
 
 [[tool.poetry.source]]
 name = "torch118"

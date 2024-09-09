@@ -53,6 +53,11 @@ To set up the environment and install the necessary dependencies, we use `poetry
     ```
     poetry shell
     ```
+4. Install flash-attn:
+
+   ```
+   pip install flash-attn==2.6.2
+   ```
 
 This will create a virtual environment and install all necessary packages specified in the `pyproject.toml` file.
 
