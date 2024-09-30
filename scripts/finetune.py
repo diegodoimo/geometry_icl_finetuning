@@ -7,6 +7,7 @@ import math
 import os
 import sys
 import pathlib
+
 sys.path.append(str(pathlib.Path(__file__).parent.parent))
 import datasets
 import warnings
@@ -101,11 +102,6 @@ def parse_args():
         type=float,
         default=0.1,
         help="The dropout rate of lora modules.",
-    )
-    parser.add_argument(
-        "--use_flash_attn",
-        action="store_true",
-        help="If passed, will use flash attention to train the model.",
     )
     parser.add_argument(
         "--tokenizer_name",
@@ -351,7 +347,6 @@ def main():
         model_name_or_path=args.model_name_or_path,
         low_cpu_mem_usage=args.low_cpu_mem_usage,
         precision=torch.bfloat16,
-        use_flash_attention_2=args.use_flash_attn,
         activation_checkpointing=args.activation_checkpointing,
     )
     vocab_size = model.config.vocab_size
@@ -862,7 +857,7 @@ def get_cpt_steps(nsteps, max_train_steps, logspace=True):
 
 
 if __name__ == "__main__":
-    if 'WORLD_SIZE' not in os.environ or 'RANK' not in os.environ:
+    if "WORLD_SIZE" not in os.environ or "RANK" not in os.environ:
         WORLD_SIZE = 1
         RANK = 0
     else:
