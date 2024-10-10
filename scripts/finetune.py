@@ -34,6 +34,7 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     CheckpointImpl,
     apply_activation_checkpointing,
 )
+from transformers import AutoTokenizer
 
 # *******************************************************************
 
@@ -48,7 +49,6 @@ from src.utils.helpers_finetune import (
 from src.utils.dataset_utils import mmlu_dataset
 from src.utils.mmlu_pro_race import mmlu_pro_race
 from src.utils.dataloader_utils import get_dataloader
-from src.utils.tokenizer_utils import get_tokenizer
 from src.utils.optimizer_utils import get_optimizer, get_scheduler
 from src.utils.model_utils import get_model
 
@@ -102,12 +102,6 @@ def parse_args():
         type=float,
         default=0.1,
         help="The dropout rate of lora modules.",
-    )
-    parser.add_argument(
-        "--tokenizer_name",
-        type=str,
-        default=None,
-        help="Pretrained tokenizer name or path if not the same as model_name",
     )
     parser.add_argument(
         "--use_slow_tokenizer",
@@ -380,9 +374,9 @@ def main():
         if RANK == 0:
             model.print_trainable_parameters()
 
-    tokenizer = get_tokenizer(
-        tokenizer_path=args.tokenizer_name, model_path=args.model_name_or_path
-    )
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=False)
+    tokenizer.pad_token = "<pad>"
+    tokenizer.pad_token_id = tokenizer.eos_token_id
 
     # *******************************************************************************
     # # Preprocessing the datasets.

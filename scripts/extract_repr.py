@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 import pathlib
+
 sys.path.append(str(pathlib.Path(__file__).parent.parent))
 import datasets
 from accelerate import Accelerator
@@ -16,9 +17,7 @@ from src.utils.helpers_extract import get_target_layers
 from src.utils.model_utils import get_model
 from src.utils.dataloader_utils import get_dataloader
 from src.utils.dataset_utils import mmlu_dataset
-from src.utils.scienceqa import scienceqa_dataset
 from src.utils.mmlu_pro_race import mmlu_pro_race
-from src.utils.tokenizer_utils import get_tokenizer
 from src.extraction.compute_distances import estract_representations
 import torch
 import os
@@ -33,7 +32,7 @@ from torch.distributed.fsdp import (
 
 from torch.distributed.fsdp.wrap import lambda_auto_wrap_policy
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
-
+from transformers import AutoTokenizer
 
 logger = get_logger(__name__)
 
@@ -43,9 +42,7 @@ def parse_args():
         description="Finetune a transformers model on a causal language modeling task"
     )
     parser.add_argument(
-        "--dataset_name",
-        type=str,
-        default="mmlu",
+        "--dataset_name", type=str, default="mmlu", choices=["mmlu", "mmlu_pro_race"]
     )
     parser.add_argument(
         "--dataset_path",
@@ -53,15 +50,9 @@ def parse_args():
         default=None,
     )
     parser.add_argument(
-        "--checkpoint_dir",
+        "--model_name_or_path",
         type=str,
         required=False,
-    )
-    parser.add_argument(
-        "--tokenizer_dir",
-        type=str,
-        default=None,
-        help="Pretrained tokenizer name or path if not the same as model_name",
     )
     parser.add_argument(
         "--low_cpu_mem_usage",
@@ -190,10 +181,7 @@ def parse_args():
     parser.add_argument("--ckpt_epoch", type=int, default=None)
     parser.add_argument("--step", type=int, default=None)
     parser.add_argument("--dev_index", type=int, default=None)
-    parser.add_argument("--sample_questions", action="store_true")
     parser.add_argument("--random_order", action="store_true")
-    parser.add_argument("--few_shot_topics", action="store_true")
-    parser.add_argument("--prompt_mmlu", action="store_true")
     args = parser.parse_args()
     return args
 
@@ -259,17 +247,18 @@ def main():
             f"world size = {args.micro_batch_size}. Setting micro_batch_size =1"
         )
 
-    if args.checkpoint_dir is None:
+    if args.model_name_or_path is None:
         model_name = args.model_name
     else:
-        model_name = args.checkpoint_dir.split("/")[-1]
+        model_name = args.model_name_or_path.split("/")[-1]
     # **************************************************************************************
     model = get_model(
         accelerator=accelerator,
-        model_name_or_path=args.checkpoint_dir,
+        model_name_or_path=args.model_name_or_path,
         precision=torch.bfloat16,
         low_cpu_mem_usage=args.low_cpu_mem_usage,
     )
+
     is_finetuned = False
     if args.finetuned_path:
         assert args.step is None or args.ckpt_epoch is None
@@ -290,9 +279,10 @@ def main():
 
     # ***************************************************************************************
 
-    tokenizer = get_tokenizer(
-        tokenizer_path=args.tokenizer_dir, model_path=args.checkpoint_dir
-    )
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=False)
+    tokenizer.pad_token = "<pad>"
+    tokenizer.pad_token_id = tokenizer.eos_token_id
+
     max_seq_len = model.config.max_position_embeddings
     if args.max_seq_len is not None:
         max_seq_len = args.max_seq_len
@@ -315,29 +305,7 @@ def main():
             split=args.split,
         )
 
-    elif args.dataset_name == "scienceqa":
-        accelerator.print("dataset: scienceqa")
-        accelerator.print(f"num_few_shots: {args.num_few_shots}")
-        if args.few_shot_topics:
-            accelerator.print("subjects = topics")
-        else:
-            accelerator.print("subjects = category")
-        if args.prompt_mmlu:
-            accelerator.print("mmlu prompt")
-
-        dataset_class = scienceqa_dataset(
-            dataset_path=args.dataset_path,
-            tokenizer=tokenizer,
-            max_seq_len=max_seq_len,
-            num_few_shots=args.num_few_shots,
-            accelerator=accelerator,
-            num_processes=args.preprocessing_num_workers,
-            split=args.split,
-            prompt_mmlu=args.prompt_mmlu,
-            few_shot_topics=args.few_shot_topics,
-        )
     elif args.dataset_name == "mmlu_pro_race":
-        subject = ["biology", "business"]
         if args.dev_index is not None:
             print("few_shot_index", args.dev_index)
         dataset_class = mmlu_pro_race(
@@ -348,11 +316,9 @@ def main():
             accelerator=accelerator,
             num_processes=args.preprocessing_num_workers,
             split=args.split,
-            subject=subject,
             dev_index=args.dev_index,
             seed=args.seed,
             random_order=args.random_order,
-            sample_questions=args.sample_questions,
         )
 
     dataset, longest_seq = dataset_class.construct_dataset()
@@ -399,18 +365,8 @@ def main():
     accelerator.print("num_total_samples", nsamples)
 
     inner_path = f"{args.dataset_name}"
-    if args.dataset_name == "scienceqa":
-        # some opttions for the scienceqa dataset are save in different categories
-        if args.few_shot_topics:
-            inner_path += "/few_shot_topics/"
-        else:
-            inner_path += "/few_shot_category/"
-        if args.prompt_mmlu:
-            inner_path += "/prompt_mmlu/"
 
-    if args.sample_questions:
-        inner_path += f"/evaluated_{args.split}/sampled/{model_name}/{args.seed}/{args.num_few_shots}shot"
-    elif args.random_order:
+    if args.random_order:
         inner_path += f"evaluated_{args.split}/shuffled/{model_name}/{args.seed}/{args.num_few_shots}shot"
     else:
         inner_path += f"/evaluated_{args.split}/{model_name}/{args.num_few_shots}shot"
@@ -436,7 +392,7 @@ def main():
 
 
 if __name__ == "__main__":
-    if 'WORLD_SIZE' not in os.environ or 'RANK' not in os.environ:
+    if "WORLD_SIZE" not in os.environ or "RANK" not in os.environ:
         WORLD_SIZE = 1
         RANK = 0
     else:
