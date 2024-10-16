@@ -312,46 +312,6 @@ def main():
             split=args.split,
         )
 
-    elif args.dataset_name == "scienceqa":
-        accelerator.print("dataset: scienceqa")
-        accelerator.print(f"num_few_shots: {args.num_few_shots}")
-        if args.few_shot_topics:
-            accelerator.print("subjects = topics")
-        else:
-            accelerator.print("subjects = category")
-        if args.prompt_mmlu:
-            accelerator.print("mmlu prompt")
-
-        dataset_class = scienceqa_dataset(
-            dataset_path=args.dataset_path,
-            tokenizer=tokenizer,
-            max_seq_len=max_seq_len,
-            num_few_shots=args.num_few_shots,
-            accelerator=accelerator,
-            num_processes=args.preprocessing_num_workers,
-            split=args.split,
-            prompt_mmlu=args.prompt_mmlu,
-            few_shot_topics=args.few_shot_topics,
-        )
-    elif args.dataset_name == "mmlu_pro_race":
-        subject = ["biology", "business"]
-        if args.dev_index is not None:
-            print("few_shot_index", args.dev_index)
-        dataset_class = mmlu_pro_race(
-            dataset_path=args.dataset_path,
-            tokenizer=tokenizer,
-            max_seq_len=max_seq_len,
-            num_few_shots=args.num_few_shots,
-            accelerator=accelerator,
-            num_processes=args.preprocessing_num_workers,
-            split=args.split,
-            subject=subject,
-            dev_index=args.dev_index,
-            seed=args.seed,
-            random_order=args.random_order,
-            sample_questions=args.sample_questions,
-        )
-
     dataset, longest_seq = dataset_class.construct_dataset()
 
     accelerator.print("num few shots:", args.num_few_shots)
@@ -373,15 +333,6 @@ def main():
     model = accelerator.prepare(model)
     accelerator.print("model loaded to gpus")
     print_memory_consumed(accelerator.process_index)
-
-    # just few forward passes with the longest sequences
-    accelerator.print("testing longest seq fints into memory..")
-    sys.stdout.flush()
-    is_memory_enough(
-        model, longest_seq, args.micro_batch_size, pad_token_id, WORLD_SIZE
-    )
-    print_memory_consumed(accelerator.process_index)
-    sys.stdout.flush()
 
     target_layers = get_target_layers(
         model=model,
