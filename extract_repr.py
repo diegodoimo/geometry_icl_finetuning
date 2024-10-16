@@ -13,8 +13,6 @@ from utils.helpers_extract import get_target_layers
 from utils.model_utils import get_model
 from utils.dataloader_utils import get_dataloader
 from utils.dataset_utils import mmlu_dataset
-from utils.scienceqa import scienceqa_dataset
-from utils.mmlu_pro_race import mmlu_pro_race
 from utils.tokenizer_utils import get_tokenizer
 from extraction.compute_distances import estract_representations
 import torch
