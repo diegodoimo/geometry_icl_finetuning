@@ -14,6 +14,9 @@ pip install -r requirements.txt
 ```
 
 ### Extract the intermediate representations in a slurm cluster
+
+The memory consumed extracting the representations for llama-3-8b in a 5shot setup is about 34GB and takes roughly 32min on a A100 GPU.
+
 ```
 sbatch submit_extract
 ```
