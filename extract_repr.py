@@ -254,14 +254,14 @@ def main():
             f"world size = {args.micro_batch_size}. Setting micro_batch_size =1"
         )
 
-    if args.checkpoint_dir is None:
+    if args.model_name_or_path is None:
         model_name = args.model_name
     else:
-        model_name = args.checkpoint_dir.split("/")[-1]
+        model_name = args.model_name_or_path.split("/")[-1]
     # **************************************************************************************
     model = get_model(
         accelerator=accelerator,
-        model_name_or_path=args.checkpoint_dir,
+        model_name_or_path=args.model_name_or_path,
         precision=torch.bfloat16,
         low_cpu_mem_usage=args.low_cpu_mem_usage,
     )
@@ -286,7 +286,7 @@ def main():
     # ***************************************************************************************
 
     tokenizer = get_tokenizer(
-        tokenizer_path=args.tokenizer_dir, model_path=args.checkpoint_dir
+        tokenizer_path=args.tokenizer_dir, model_path=args.model_name_or_path
     )
     max_seq_len = model.config.max_position_embeddings
     if args.max_seq_len is not None:
