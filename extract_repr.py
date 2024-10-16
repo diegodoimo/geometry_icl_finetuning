@@ -17,7 +17,7 @@ from utils.tokenizer_utils import get_tokenizer
 from extraction.compute_distances import estract_representations
 import torch
 import os
-from utils.helpers_extract import print_memory_consumed, is_memory_enough
+from utils.helpers_extract import print_memory_consumed
 
 from functools import partial
 from accelerate import FullyShardedDataParallelPlugin
@@ -48,7 +48,7 @@ def parse_args():
         default=None,
     )
     parser.add_argument(
-        "--checkpoint_dir",
+        "--model_name_or_path",
         type=str,
         required=False,
     )
