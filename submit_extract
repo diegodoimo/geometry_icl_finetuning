@@ -17,31 +17,17 @@ export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 model_name=llama-3-8b
 path=llama_v3
 
-
 torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:0 \
        	--nnodes=1  --nproc-per-node=1 \
     extract_repr.py \
-    --checkpoint_dir  "/u/area/ddoimo/ddoimo/models/$path/models_hf/$model_name" \
-    --use_slow_tokenizer \
+    --dataset_name "mmlu" \
+    --model_name_or_path  "/u/area/ddoimo/ddoimo/models/$path/models_hf/$model_name" \
     --preprocessing_num_workers 16 \
     --micro_batch_size 1 \
     --out_dir "./results" \
-    --logging_steps 100 \
-    --layer_interval 1 \
     --remove_duplicates \
-    --use_last_token \
     --max_seq_len 4090 \
     --split "test" \
     --num_few_shots 5 \
-    --dataset_name "mmlu_pro_race" \
-    --dataset_path "/orfeo/cephfs/scratch/area/ddoimo/open/geometric_lens/repo/diego/mmlu_pro_race"\
-    #--save_distances \
-    #--save_repr \
-    
-#--seed $seed \
-    #--finetuned_path  "/u/area/ddoimo/ddoimo/finetuning_llm/open-instruct/results" \
-    #--finetuned_mode "dev_val_balanced_20samples" \
-    #--finetuned_epochs 4 \
-    #--model_seed 1 \
-    #--save_distances \
-    #--save_repr 
+    --save_repr \
+    --save_distances 
