@@ -52,7 +52,7 @@ class mmlu_dataset:
         split="test",
         mask_path=None,
         samples_per_subject=None,
-        dataset_path=None,
+        random_order=True,
     ):
 
         self.dataset = "mmlu"
@@ -66,6 +66,7 @@ class mmlu_dataset:
         self.split = split
         self.mask_path = mask_path
         self.samples_per_subject = samples_per_subject
+        self.random_order = random_order
 
     # ****************************************************
     def construct_question(self, question, choices, answer, include_answer=False):
@@ -108,9 +109,17 @@ class mmlu_dataset:
                 )
 
         for i in range(len(questions)):
+            # standard mmlu promp template
             prompt = f"The following are multiple choice questions (with answers) about{format_subject(subjects[i])}.\n\n"
             current_subject = subjects[i]
-            for j in range(num_few_shots):
+
+            indices = np.arange(num_few_shots)
+            # shuffle few shots if needed
+            if self.random_order:
+                indices = rng.permutation(num_few_shots)
+
+            # add few_shots if num_few_shots > 0
+            for j in indices:
                 shot = local_dev_set[current_subject][j]
                 prompt += self.construct_question(
                     shot["question"],
@@ -118,6 +127,8 @@ class mmlu_dataset:
                     shot["answer"],
                     include_answer=True,
                 )
+
+            # add question
             question = self.construct_question(
                 questions[i], choices[i], answer_indices[i]
             )
@@ -136,7 +147,6 @@ class mmlu_dataset:
             for prompt in prompts
         ]
 
-        # targets are tokenized with space included
         tokenized_labels = [
             tokenizer(
                 self.answers[index], return_tensors="pt", add_special_tokens=False
@@ -308,7 +318,6 @@ class mmlu_dataset:
             num_proc=self.num_processes,
             load_from_cache_file=False,
         )
-
         self.accelerator.print("tokenization finished")
         sys.stdout.flush()
 

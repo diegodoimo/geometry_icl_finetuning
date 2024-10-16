@@ -65,8 +65,8 @@ def estract_representations(
     )
     # here we extract the activations
     extr_act.extract(dataloader, tokenizer)
-    accelerator.print(f"num_tokens: {extr_act.hidden_size/10**3}k")
-    accelerator.print((time.time() - start) / 3600, "hours")
+    accelerator.print(f"num samples: {extr_act.hidden_size/10**3}k")
+    accelerator.print(f"total time: {(time.time() - start) / 60} minutes\n")
 
     if accelerator.is_main_process:
         # dictionary containing the representation
@@ -82,6 +82,7 @@ def estract_representations(
 
         if save_distances:
             for i, (layer, act) in enumerate(act_dict.items()):
+                accelerator.print(f"computing distances for layer {layer}")
                 act = act.to(torch.float64).numpy()
 
                 save_backward_indices = False
@@ -100,7 +101,6 @@ def estract_representations(
                     range_scaling = min(1050, n_samples - 1)
                     maxk = min(maxk, n_samples - 1)
 
-                    start = time.time()
                     distances, dist_index, mus, _ = compute_distances(
                         x=act,
                         n_neighbors=maxk + 1,
@@ -109,7 +109,6 @@ def estract_representations(
                         range_scaling=range_scaling,
                         argsort=False,
                     )
-                    accelerator.print((time.time() - start) / 60, "min")
 
                     np.save(
                         f"{dirpath}/l{target_layer_labels[i]}{filename}_dist",

@@ -91,9 +91,11 @@ def measure_performance(extr_act, dataloader, tokenizer, accelerator):
         answers[: len(constrained_predictions)],
         np.array(subjects[: len(predictions)]),
     )
+
     accelerator.print("exact_match constrained:", acc_constrained["macro"])
     accelerator.print("exact_match macro:", acc_pred["macro"])
     accelerator.print("exact_match micro:", acc_pred["micro"])
+
     for subject, acc in acc_pred["subjects"].items():
         accelerator.print(f"{subject}: {acc:.3f}\n")
 
@@ -112,13 +114,14 @@ def remove_duplicates_func(act, accelerator):
 
     act, idx, inverse = np.unique(act, axis=0, return_index=True, return_inverse=True)
     accelerator.print(len(idx), len(inverse))
-    save_backward_indices=False
+    save_backward_indices = False
     if len(idx) == len(inverse):
         # if no overlapping data has been found return the original ordred array
         assert len(np.unique(inverse)) == len(inverse)
         act = act[inverse]
     else:
         save_backward_indices = True
+
     accelerator.print(f"unique_samples = {len(idx)}")
     accelerator.print(f"num_duplicates = {len(inverse)-len(idx)}")
 

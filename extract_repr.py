@@ -28,7 +28,7 @@ from torch.distributed.fsdp import (
 
 from torch.distributed.fsdp.wrap import lambda_auto_wrap_policy
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
-
+from transformers import AutoTokenizer
 
 logger = get_logger(__name__)
 
@@ -184,11 +184,8 @@ def parse_args():
     )
     parser.add_argument("--ckpt_epoch", type=int, default=None)
     parser.add_argument("--step", type=int, default=None)
-    parser.add_argument("--dev_index", type=int, default=None)
     parser.add_argument("--sample_questions", action="store_true")
     parser.add_argument("--random_order", action="store_true")
-    parser.add_argument("--few_shot_topics", action="store_true")
-    parser.add_argument("--prompt_mmlu", action="store_true")
     args = parser.parse_args()
     return args
 
@@ -285,9 +282,10 @@ def main():
 
     # ***************************************************************************************
 
-    tokenizer = get_tokenizer(
-        tokenizer_path=args.tokenizer_dir, model_path=args.model_name_or_path
-    )
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=False)
+    tokenizer.pad_token = "<pad>"
+    tokenizer.pad_token_id = tokenizer.eos_token_id
+
     max_seq_len = model.config.max_position_embeddings
     if args.max_seq_len is not None:
         max_seq_len = args.max_seq_len
@@ -308,6 +306,7 @@ def main():
             num_few_shots=args.num_few_shots,
             num_processes=args.preprocessing_num_workers,
             split=args.split,
+            random_order=True,
         )
 
     dataset, longest_seq = dataset_class.construct_dataset()
@@ -326,7 +325,6 @@ def main():
 
     # ***********************************************************************
 
-    # Put the model on with `accelerator`.
     print_memory_consumed(accelerator.process_index)
     model = accelerator.prepare(model)
     accelerator.print("model loaded to gpus")
@@ -345,14 +343,6 @@ def main():
     accelerator.print("num_total_samples", nsamples)
 
     inner_path = f"{args.dataset_name}"
-    if args.dataset_name == "scienceqa":
-        # some opttions for the scienceqa dataset are save in different categories
-        if args.few_shot_topics:
-            inner_path += "/few_shot_topics/"
-        else:
-            inner_path += "/few_shot_category/"
-        if args.prompt_mmlu:
-            inner_path += "/prompt_mmlu/"
 
     if args.sample_questions:
         inner_path += f"/evaluated_{args.split}/sampled/{model_name}/{args.seed}/{args.num_few_shots}shot"
