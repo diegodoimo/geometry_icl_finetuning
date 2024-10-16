@@ -63,11 +63,6 @@ def parse_args():
         ),
     )
     parser.add_argument(
-        "--use_slow_tokenizer",
-        action="store_true",
-        help="If passed, will use a slow tokenizer (not backed by the 🤗 Tokenizers library).",
-    )
-    parser.add_argument(
         "--max_seq_len",
         type=int,
         default=None,
@@ -76,7 +71,7 @@ def parse_args():
     parser.add_argument(
         "--micro_batch_size",
         type=int,
-        default=4,
+        default=1,
         help="Batch size (per device) for the training dataloader.",
     )
     parser.add_argument(
@@ -94,7 +89,7 @@ def parse_args():
     parser.add_argument(
         "--preprocessing_num_workers",
         type=int,
-        default=None,
+        default=16,
         help="The number of processes to use for the preprocessing.",
     )
     parser.add_argument(
@@ -102,11 +97,6 @@ def parse_args():
         type=int,
         default=100,
         help="Print every logging_steps samples processed.",
-    )
-    parser.add_argument(
-        "--use_last_token",
-        action="store_true",
-        help="If passed, ID will be measured on the last token represenation.",
     )
     parser.add_argument(
         "--save_distances",
@@ -180,7 +170,6 @@ def parse_args():
     )
     parser.add_argument("--ckpt_epoch", type=int, default=None)
     parser.add_argument("--step", type=int, default=None)
-    parser.add_argument("--dev_index", type=int, default=None)
     parser.add_argument("--random_order", action="store_true")
     args = parser.parse_args()
     return args
@@ -305,24 +294,7 @@ def main():
             split=args.split,
         )
 
-    elif args.dataset_name == "mmlu_pro_race":
-        if args.dev_index is not None:
-            print("few_shot_index", args.dev_index)
-        dataset_class = mmlu_pro_race(
-            dataset_path=args.dataset_path,
-            tokenizer=tokenizer,
-            max_seq_len=max_seq_len,
-            num_few_shots=args.num_few_shots,
-            accelerator=accelerator,
-            num_processes=args.preprocessing_num_workers,
-            split=args.split,
-            dev_index=args.dev_index,
-            seed=args.seed,
-            random_order=args.random_order,
-        )
-
     dataset, longest_seq = dataset_class.construct_dataset()
-
     accelerator.print("num few shots:", args.num_few_shots)
     accelerator.print("max_seq_len:", len(longest_seq["input_ids"][0]))
 
@@ -342,15 +314,6 @@ def main():
     model = accelerator.prepare(model)
     accelerator.print("model loaded to gpus")
     print_memory_consumed(accelerator.process_index)
-
-    # just few forward passes with the longest sequences
-    accelerator.print("testing longest seq fints into memory..")
-    sys.stdout.flush()
-    is_memory_enough(
-        model, longest_seq, args.micro_batch_size, pad_token_id, WORLD_SIZE
-    )
-    print_memory_consumed(accelerator.process_index)
-    sys.stdout.flush()
 
     target_layers = get_target_layers(
         model=model,
