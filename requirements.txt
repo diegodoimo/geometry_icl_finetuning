@@ -8,3 +8,4 @@ peft==0.12.0
 tokenizers==0.19.1
 transformers==4.43.0
 flash-attn==2.6.2
+git+https://github.com/sissa-data-science/DADApy
