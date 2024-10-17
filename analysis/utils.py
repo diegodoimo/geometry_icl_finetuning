@@ -4,7 +4,6 @@ import numpy as np
 import warnings
 import torch
 import pickle
-from extraction.pairwise_distances import compute_distances
 from sklearn.metrics import adjusted_rand_score
 from dadapy import data
 from collections import Counter
@@ -69,7 +68,7 @@ def return_label_overlap(
     k_per_sample, sample_weights, max_k = _label_imbalance_helper(
         labels, k, class_fraction
     )
-    # print(k_per_sample, sample_weights, max_k)
+    #print(k_per_sample, sample_weights, max_k)
     assert len(labels) == dist_indices.shape[0]
 
     neighbor_index = dist_indices[:, 1 : max_k + 1]
@@ -109,7 +108,7 @@ def analyze(
 
     activations = torch.load(f"{base_path}/l{layer}_target.pt")
     activations = activations.to(torch.float64).numpy()
-    print("dataset_size:", activations.shape[0])
+    #print("dataset_size:", activations.shape[0])
 
     with open(f"{base_path}/statistics_target.pkl", "rb") as f:
         stats = pickle.load(f)
@@ -135,7 +134,7 @@ def analyze(
     activations = activations[indices]
     subj_label = subj_label[indices]
     letter_label = letter_label[indices]
-    print("dataset_size after mask and prune:", activations.shape[0])
+    #print("dataset_size after mask and prune:", activations.shape[0])
 
     # ***********************************************************************
 
@@ -151,6 +150,7 @@ def analyze(
     # )
 
     d = data.Data(coordinates=activations)
+    d.compute_distances(maxk=maxk)
     ids, _, _ = d.return_id_scaling_gride(range_max=100)
     dist_index_base = d.dist_indices
 

@@ -2,15 +2,15 @@
 #SBATCH --partition=DGX
 #SBATCH --account=lade
 #SBATCH --nodes=1
-#SBATCH --time=2:00:00            
+#SBATCH --time=1:00:00            
 #SBATCH --ntasks-per-node=1       
 #SBATCH --cpus-per-task=32           
-#SBATCH --mem=100G                
+#SBATCH --mem=50G                
 #SBATCH --job-name=test
 #SBATCH --gres=gpu:1
 
 
-source /u/area/ddoimo/anaconda3/bin/activate ./env_emd
+source /u/area/ddoimo/anaconda3/bin/activate ./env_amd
 export OMP_NUM_THREADS=32
 export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 
@@ -26,8 +26,8 @@ torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:0 \
     --micro_batch_size 1 \
     --out_dir "./results" \
     --remove_duplicates \
-    --max_seq_len 4090 \
+    --max_seq_len 2048 \
     --split "test" \
-    --num_few_shots 5 \
+    --num_few_shots 1 \
     --save_repr \
     --save_distances 
