@@ -17,8 +17,8 @@ export OMP_NUM_THREADS=32
 num_shots=5
 python analysis/repr_analysis.py \
     --model_name "llama-3-8b" \
-    --results_path "./results/statistics" \
-    --layer_path "results/layers/mmlu/pretrained/test/llama-3-8b/$num_shots" \
+    --results_path "./results" \
+    --layer_path "results/layers/mmlu/pretrained/test/llama-3-8b/${num_shots}shot" \
     --mask_path "analysis/test_mask_200.npy" \
     --eval_dataset "test" \
     --num_shots $num_shots  
