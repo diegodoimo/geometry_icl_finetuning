@@ -30,4 +30,3 @@ torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:0 \
     --split "test" \
     --num_few_shots 1 \
     --save_repr \
-    --save_distances 

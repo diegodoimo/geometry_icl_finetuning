@@ -4,33 +4,40 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import os
+import argparse
 
 
-def get_repr_for_test(results_dir, dataset, folder, model, split):
-
-    name = f"cluster_{model}_{dataset}_{split}_0shot.pkl"
-    with open(f"{results_dir}/{folder}/{model}/{name}", "rb") as f:
-        clus_train = pickle.load(f)
-
-    return clus_train
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--figures_dir",
+        type=str,
+        default="figures",
+    )
+    parser.add_argument(
+        "--statistics_dir",
+        type=str,
+        default="figures",
+    )
+    args = parser.parse_args()
+    return args
 
 
 # ***********************************************************************************
-plots_dir = "figures"
-results_dir = "./results/statistics"
-os.makedirs(plots_dir, exist_ok=True)
+args = parse_args()
+
+os.makedirs(args.figures_dir, exist_ok=True)
 
 
 profiles = {}
 for shot in [0, 1, 2, 5]:
     name = f"cluster_llama-3-8b_mmlu_test_{shot}shot.pkl"
-    with open(f"{results_dir}/pretrained/llama-3-8b/{name}", "rb") as f:
+    with open(f"{args.statistics_dir}/pretrained/llama-3-8b/{name}", "rb") as f:
         clusters = pickle.load(f)
     profiles[f"subjects-ari_{shot}shot"] = clusters[f"subjects-ari-{shot}shot-z1.6-k16"]
     profiles[f"letters-ari_{shot}shot"] = clusters[f"letters-ari-{shot}shot-z1.6-k16"]
-    profiles[f"core-point-fraction_{shot}shot"] = clusters[
-        f"core_point_fraction-{shot}shot"
-    ]
+
+# *************************************************************************
 
 sns.set_style(
     "whitegrid",
@@ -70,4 +77,4 @@ ax.set_xticklabels(np.arange(1, 34, 4))
 ax.set_ylim(-0.05, 0.9)
 
 gs1.tight_layout(fig)
-plt.savefig(f"{plots_dir}/aris.png", dpi=200)
+plt.savefig(f"{args.figures_dir}/aris.png", dpi=200)
