@@ -340,10 +340,10 @@ def main():
     nsamples = len(dataloader.dataset)
     accelerator.print("num_total_samples", nsamples)
 
-    path = f"{args.out_dir}/{args.dataset_name}/pretrained/{args.split}/{model_name}/{args.num_few_shots}shot"
+    path = f"{args.out_dir}/layers/{args.dataset_name}/pretrained/{args.split}/{model_name}/{args.num_few_shots}shot"
 
     if args.finetuned_path:
-        path = f"{args.out_dir}/{args.dataset_name}/finetuned/{args.split}/{model_name}/{args.finetuned_epochs}epochs/{ckpt}"
+        path = f"{args.out_dir}/layers/{args.dataset_name}/finetuned/{args.split}/{model_name}/{args.finetuned_epochs}epochs/{ckpt}"
 
     estract_representations(
         accelerator=accelerator,

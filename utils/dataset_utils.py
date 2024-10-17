@@ -120,7 +120,7 @@ class mmlu_dataset:
 
             # add few_shots if num_few_shots > 0
             for j in indices:
-                shot = local_dev_set[current_subject][j]
+                shot = local_dev_set[current_subject][int(j)]
                 prompt += self.construct_question(
                     shot["question"],
                     shot["choices"],

@@ -4,7 +4,6 @@ import numpy as np
 import warnings
 import torch
 import pickle
-from extraction.pairwise_distances import compute_distances
 from sklearn.metrics import adjusted_rand_score
 from dadapy import data
 from collections import Counter
@@ -151,7 +150,7 @@ def analyze(
     # )
 
     d = data.Data(coordinates=activations)
-    ids, _, _ = d.return_id_scaling_gride(range_max=100)
+    ids, _, _ = d.return_id_scaling_gride(range_max=maxk)
     dist_index_base = d.dist_indices
 
     # this sets the kNN order of the density estimator consistent with

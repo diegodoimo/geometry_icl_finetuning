@@ -73,7 +73,7 @@ overlaps = defaultdict(list)
 clusters = defaultdict(list)
 intrinsic_dim = defaultdict(list)
 
-args.results_path += f"/pretrained/{args.model_name}"
+args.results_path += f"statics/pretrained/{args.model_name}"
 os.makedirs(args.results_path, exist_ok=True)
 
 # compute the statistics for all the shots unless a number of shot is given
