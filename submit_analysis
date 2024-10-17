@@ -17,9 +17,7 @@ export OMP_NUM_THREADS=32
 python diego/analysis/repr_analysis.py \
     --model_name "llama-3-8b" \
     --results_path "./results" \
-    --layer_path "" \
+    --layer_path "results/mmlu/evaluated_test/llama-3-8b/5shot" \
     --mask_path analysis/test_mask_200.npy \
-    --epochs 6 \
-    --samples_subject 200 \
     --eval_dataset "test" \
     --num_shots $num_shots 

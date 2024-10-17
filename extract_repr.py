@@ -184,8 +184,6 @@ def parse_args():
     )
     parser.add_argument("--ckpt_epoch", type=int, default=None)
     parser.add_argument("--step", type=int, default=None)
-    parser.add_argument("--sample_questions", action="store_true")
-    parser.add_argument("--random_order", action="store_true")
     args = parser.parse_args()
     return args
 
@@ -342,19 +340,11 @@ def main():
     nsamples = len(dataloader.dataset)
     accelerator.print("num_total_samples", nsamples)
 
-    inner_path = f"{args.dataset_name}"
-
-    if args.sample_questions:
-        inner_path += f"/evaluated_{args.split}/sampled/{model_name}/{args.seed}/{args.num_few_shots}shot"
-    elif args.random_order:
-        inner_path += f"evaluated_{args.split}/shuffled/{model_name}/{args.seed}/{args.num_few_shots}shot"
-    else:
-        inner_path += f"/evaluated_{args.split}/{model_name}/{args.num_few_shots}shot"
+    path = f"{args.out_dir}/{args.dataset_name}/pretrained/{args.split}/{model_name}/{args.num_few_shots}shot"
 
     if args.finetuned_path:
-        inner_path = f"finetuned_{args.finetuned_mode}/evaluated_{args.split}/{model_name}/{args.finetuned_epochs}epochs/{ckpt}"
+        path = f"{args.out_dir}/{args.dataset_name}/finetuned/{args.split}/{model_name}/{args.finetuned_epochs}epochs/{ckpt}"
 
-    dirpath = args.out_dir + f"/{inner_path}"
     estract_representations(
         accelerator=accelerator,
         model=model,
@@ -362,7 +352,7 @@ def main():
         tokenizer=tokenizer,
         target_layers=target_layers,
         maxk=args.maxk,
-        dirpath=dirpath,
+        dirpath=path,
         filename=args.out_filename,
         remove_duplicates=args.remove_duplicates,
         save_distances=args.save_distances,
