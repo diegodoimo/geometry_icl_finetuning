@@ -140,14 +140,6 @@ def analyze(
 
     maxk = 1000
     assert indices.shape[0] > maxk, (indices.shape[0], maxk)
-    # distances_base, dist_index_base, _, _ = compute_distances(
-    #     X=activations,
-    #     n_neighbors=maxk + 1,
-    #     n_jobs=1,
-    #     working_memory=2048,
-    #     range_scaling=2048,
-    #     argsort=False,
-    # )
 
     d = data.Data(coordinates=activations)
     d.compute_distances(maxk=maxk)
@@ -164,36 +156,40 @@ def analyze(
     assignment = d.compute_clustering_ADP(Z=z, halo=False)
 
     # number of clusters found
-    clusters[f"nclus-{spec}-z{z}-k{k}"] = d.N_clusters
+    clusters[f"nclus-{spec}-z{z}-k{k}"].append(d.N_clusters)
 
     # ARI with subjects
-    clusters[f"subjects-ari-{spec}-z{z}-k{k}"] = adjusted_rand_score(
-        assignment, subj_label
+    clusters[f"subjects-ari-{spec}-z{z}-k{k}"].append(
+        adjusted_rand_score(assignment, subj_label)
     )
 
     # ARI with answers
-    clusters[f"letters-ari-{spec}-z{z}-k{k}"] = adjusted_rand_score(
-        assignment, letter_label
+    clusters[f"letters-ari-{spec}-z{z}-k{k}"].append(
+        adjusted_rand_score(assignment, letter_label)
     )
 
     # halo computation
     assignment_core = d.compute_clustering_ADP(Z=z, halo=True)
-    clusters[f"core_point_fraction-{spec}"] = np.sum(assignment_core != -1) / len(
-        assignment_core
+    clusters[f"core_point_fraction-{spec}"].append(
+        np.sum(assignment_core != -1) / len(assignment_core)
     )
 
     # overlap subjects
-    overlaps[f"subjects-{spec}-{class_fraction}"] = return_label_overlap(
-        dist_indices=dist_index_base,
-        labels=list(subj_label),
-        class_fraction=class_fraction,
+    overlaps[f"subjects-{spec}-{class_fraction}"].append(
+        return_label_overlap(
+            dist_indices=dist_index_base,
+            labels=list(subj_label),
+            class_fraction=class_fraction,
+        )
     )
 
     # overlap letters
-    overlaps[f"letters-{spec}-{class_fraction}"] = return_label_overlap(
-        dist_indices=dist_index_base,
-        labels=list(letter_label),
-        class_fraction=class_fraction,
+    overlaps[f"letters-{spec}-{class_fraction}"].append(
+        return_label_overlap(
+            dist_indices=dist_index_base,
+            labels=list(letter_label),
+            class_fraction=class_fraction,
+        )
     )
 
     return clusters, intrinsic_dim, overlaps
